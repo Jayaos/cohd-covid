@@ -2,6 +2,8 @@ import csv
 import logging
 import os
 import datetime
+import codecs
+from collections import defaultdict
 
 def logging_setup(output_dir):
     """ Set up for logging to log to file and to stdout
@@ -124,3 +126,86 @@ def load_concepts(file, database, extra_header_lines_skip=0):
     
     fh.close()
     return concepts
+
+def load_descendants(file, database, extra_header_lines_skip=0):
+    """Load each concept's direct descendants
+    Parameters
+    ----------
+    file: string - Descendants data file
+    database: string - Originating database. See _open_csv_reader
+    extra_header_lines_skip: int - Number of lines to skip after the header
+    Returns
+    -------
+    Dictionary[concept_id] -> set(concept_ids)
+    """
+    logging.info('Loading descendants...')
+
+    # Open csv reader
+    fh, reader = _open_csv_reader(file, database)
+
+    # Read header
+    header = next(reader)
+    columns = _find_columns(header, ['concept_id', 'descendant_concept_id'])
+    table_width = len(header)
+
+    # Skip extra formatting lines after header
+    for i in range(extra_header_lines_skip):
+        next(reader)
+
+    # Read in each row of the file and add the descendants to the dictionary
+    concept_descendants = defaultdict(set)
+    for row in reader:
+        if len(row) == table_width:
+            # Convert concept IDs to ints
+            try:
+              concept_id, descendant_concept_id = [int(row[i]) for i in columns]
+            except:
+              continue
+            concept_descendants[concept_id].add(descendant_concept_id)
+
+    fh.close()
+    return concept_descendants
+
+def load_patient_data(file, database, extra_header_lines_skip=0):
+    """Load patient demographics data extracted from the OMOP person table
+    
+    Parameters
+    ----------
+    file: string - Patient data file
+    database: string - Originating database. See _open_csv_reader
+    extra_header_lines_skip - int - Number of lines to skip after the header
+    
+    Returns
+    -------
+    Dictionary[concept_id] -> [ethnicity, race, gender]
+    """
+    logging.info("Loading patient data...")
+
+    # Open csv reader
+    fh, reader = _open_csv_reader(file, database)
+ 
+    # Read header line to get column names
+    header = next(reader)
+    columns = _find_columns(header, ['person_id', 'ethnicity_concept_id', 'race_concept_id', 'gender_concept_id'])
+    table_width = len(header)
+
+    # Skip extra formatting lines after header
+    for i in range(extra_header_lines_skip):
+        next(reader)
+
+    # Read in each row
+    patient_info = defaultdict(list)
+    for row in reader:
+        # Display progress
+        if reader.line_num % 1000000 == 0: 
+            logging.info(reader.line_num)
+            
+        if len(row) == table_width:
+            # Get ethnicity, race, and gender and convert everything to ints (they're all person IDs or concept IDs)
+            person_id, ethnicity, race, gender = [int(row[i]) for i in columns]
+            patient_info[person_id] = [ethnicity, race, gender] 
+
+    logging.info("%d persons loaded" % len(patient_info))
+            
+    fh.close()
+    return patient_info
