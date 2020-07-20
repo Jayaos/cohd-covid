@@ -1,8 +1,10 @@
 import csv
 import logging
 import os
-import datetime
 import codecs
+import sys
+import numpy as np
+from datetime import datetime
 from collections import defaultdict
 from collections import namedtuple
 
@@ -10,6 +12,22 @@ def strip_hypen(my_date):
     splitted = my_date.split("-")
     year = int(splitted[0])
     return year, "".join(splitted)
+
+def _open_csv_writer(file):
+    """Opens a CSV writer
+    
+    Opens a CSV writer compatible with the current OS environment.
+    """
+    # OS dependent parameters
+    csv_writer_params = {}
+    if sys.platform == 'win32':
+        # Windows needs lineterminator specified for csv writer
+        csv_writer_params['lineterminator'] = '\n'
+        
+    # Open file handle and csv_writer
+    fh = open(file, 'w', buffering=1)
+    writer = csv.writer(fh, delimiter='\t', **csv_writer_params)
+    return fh, writer
 
 def logging_setup(output_dir):
     """ Set up for logging to log to file and to stdout
@@ -24,7 +42,7 @@ def logging_setup(output_dir):
     root_logger.setLevel(logging.DEBUG)
 
     # File log
-    log_file = 'log_' + datetime.datetime.now().strftime("%Y-%m-%d_%H%M") + '.txt'
+    log_file = 'log_' + datetime.now().strftime("%Y-%m-%d_%H%M") + '.txt'
     log_file = os.path.join(output_dir, log_file)
     file_handler = logging.FileHandler(log_file)
     file_handler.setFormatter(log_formatter)
@@ -439,4 +457,166 @@ def merge_ranged_concept_descendants(cp_ranged, concepts, descendants):
                  (len(concepts_merged), len(cp_ranged.patient)))
 
     return ConceptPatientDataMerged(concepts_merged, cp_ranged.patient, cp_ranged.num_patients,
-                                    cp_ranged.year_min, cp_ranged.year_max)   
+    cp_ranged.year_min, cp_ranged.year_max)
+
+def single_concept_ranged_counts(output_dir, cp_ranged, randomize=True, min_count=11, additional_file_label=None):
+    """Writes concept counts and frequencies observed from a year range
+    
+    Writes results to file <output_dir>\concept_counts_<settings>.txt
+    
+    Parameters
+    ----------
+    output_dir: string - Path to folder where the results should be written
+    cp_ranged: ConceptPatientDataMerged
+    randomize: logical - True to randomize counts using Poisson (default: True)
+    min_count: int - Minimum count to be included in results (inclusive, default: 11)
+    additional_file_label: str - Additional label to append to the output file
+    Returns
+    -------
+    List of concept IDs that were exported
+    """
+    logging.info("Writing single concept ranged counts...")
+    
+    # Generate the filename based on parameters
+    randomize_str = '_randomized' if randomize else '_unrandomized'
+    min_count_str = '_mincount-%d' % min_count
+    n_pts_str = '_N-%d' % cp_ranged.num_patients
+    range_str = '_%d-%d' % (cp_ranged.year_min, cp_ranged.year_max)
+    if additional_file_label is not None:
+        additional_file_label = '_' + str(additional_file_label)
+    else:
+        additional_file_label = ''
+    label_str = range_str + randomize_str + min_count_str + n_pts_str + additional_file_label
+    filename = 'concept_counts' + label_str + '.txt'
+    logging.info(label_str)
+
+    # Write out the number of patients
+    logging.info('Num patients: %d' % cp_ranged.num_patients)
+    
+    # Open csv_writer and write header
+    output_file = os.path.join(output_dir, filename)
+    fh, writer = _open_csv_writer(output_file)
+    writer.writerow(['concept_id', 'count'])
+
+    # Keep track of concepts exported
+    concepts_exported = list()
+        
+    # Write count of each concept
+    concept_patient = cp_ranged.concept_patient
+    for concept_id in sorted(concept_patient.keys()):
+        # Get the count of unique patients
+        pts = concept_patient[concept_id]
+        npts = len(pts)
+
+        # Exclude concepts with low count for patient protection
+        if npts < min_count:
+            continue        
+        
+        # Randomize counts to protect patients
+        if randomize:
+            npts = np.random.poisson(npts)
+
+        # Write concept ID and count to file
+        writer.writerow([concept_id, npts])
+
+        # Keep track of exported concepts
+        concepts_exported.append(concept_id)
+
+    fh.close()
+
+    return concepts_exported
+
+def paired_concept_ranged_counts(output_dir, cp_ranged, randomize=True, min_count=11, additional_file_label=None):
+    """Writes paired concept counts and frequencies observed from a year range
+    
+    Writes results to file <output_dir>\concept_pair_counts_<settings>.txt
+    
+    Parameters
+    ----------
+    output_dir: string - Path to folder where the results should be written
+    cp_ranged: ConceptPatientDataMerged
+    randomize: logical - True to randomize counts using Poisson (default: True)
+    min_count: int - Minimum count to be included in results (inclusive, default: 11)
+    additional_file_label: str - Additional label to append to the output file
+    Returns
+    -------
+    List of (concept_id_1, concept_id_2) tuples that were exported
+    """
+    logging.info("Writing concept pair counts...")
+    
+    concept_patient = cp_ranged.concept_patient
+    year_min = cp_ranged.year_min
+    year_max = cp_ranged.year_max
+    
+    # Generate the filename based on parameters
+    randomize_str = '_randomized' if randomize else '_unrandomized'
+    min_count_str = '_mincount-%d' % min_count
+    n_pts_str = '_N-%d' % cp_ranged.num_patients
+    range_str = '_%d-%d' % (year_min, year_max)
+    if additional_file_label is not None:
+        additional_file_label = '_' + str(additional_file_label)
+    else:
+        additional_file_label = ''
+    label_str = range_str + randomize_str + min_count_str + n_pts_str + additional_file_label
+    filename = 'concept_pair_counts' + label_str + '.txt'
+    logging.info(label_str)
+
+    # Write out the number of patients
+    logging.info('Num patients: %d' % cp_ranged.num_patients)
+
+    # Determine which individual concepts meet the minimum count requirement so that we only include these in the loop
+    concept_ids = list()
+    for concept_id in sorted(concept_patient.keys()):
+        if len(concept_patient[concept_id]) >= min_count:
+            concept_ids.append(concept_id)
+
+    # Open csv_writer and write header
+    output_file = os.path.join(output_dir, filename)
+    fh, writer = _open_csv_writer(output_file)
+    writer.writerow(['concept_id1', 'concept_id2', 'count'])
+    
+    # How often to display progress message
+    n_concepts = len(concept_ids)
+    n_concept_pairs = np.sum(np.array(range(n_concepts - 1), dtype=np.float))
+    progress_interval = 100
+    logging.info('%d concepts meeting min_count, %d possible pairs of concepts' % (len(concept_ids), n_concept_pairs))
+
+    # Keep track of concept-pairs
+    concept_pairs_exported = list()
+
+    # Write out each concept's count
+    for counter, concept_id_1 in enumerate(concept_ids):
+        # Progress message
+        if counter % progress_interval == 0:
+            logging.info('%d, %.04f%%' % (counter, counter / float(n_concepts) * 100))
+
+        # Get set of patients for concept 1
+        pts_1 = concept_patient[concept_id_1]
+        
+        # Write each concept pair only once, i.e., write out [concept_id_1, concept_id_2, count] but not
+        # [concept_id_2, concept_id_1, count]
+        for concept_id_2 in concept_ids[(counter + 1):]:
+            # Count the number of shared patients
+            npts = len(pts_1 & concept_patient[concept_id_2])
+
+            # Exclude concepts with low count for patient protection
+            if npts < min_count:
+                continue                
+
+            # Randomize counts to protect patients
+            if randomize:
+                npts = np.random.poisson(npts)
+
+            # Write concept_id_1, concept_id_2, and co-occurrence count to file
+            writer.writerow([concept_id_1, concept_id_2, npts])
+
+            # Keep track of concept-pairs
+            concept_pairs_exported.append((concept_id_1, concept_id_2))
+
+        # Flush the file at each major interval
+        fh.flush()
+        os.fsync(fh.fileno())
+
+    fh.close()
+
+    return concept_pairs_exported
