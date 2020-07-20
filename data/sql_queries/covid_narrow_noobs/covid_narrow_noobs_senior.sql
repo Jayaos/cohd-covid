@@ -1008,7 +1008,7 @@ SELECT DISTINCT person_id INTO #target_cohort
 FROM #final_cohort;
 
 -- Export person ID, start date, and concept IDs for conditions, drugs, and procedures
-:OUT D:\cohd\covid_narrow_noobs.txt
+:OUT D:\cohd\covid_narrow_noobs_senior.txt
 SELECT DISTINCT co.person_id, co.condition_start_date AS date, co.condition_concept_id AS concept_id
 FROM condition_occurrence co
 JOIN concept c ON co.condition_concept_id = c.concept_id
