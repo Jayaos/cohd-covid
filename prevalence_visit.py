@@ -234,7 +234,7 @@ def load_patient_data(file, database, extra_header_lines_skip=0):
     fh.close()
     return patient_info
 
-def load_concept_patient_data(file, database, patient_info, extra_header_lines_skip=0, iatrogenic_ids=set()):
+def load_concept_patient_data(file, database, patient_info, extra_header_lines_skip=0, iatrogenic_ids=set(), window="year"):
     """Load concept-year-patient data
     
     Parameters
@@ -287,10 +287,15 @@ def load_concept_patient_data(file, database, patient_info, extra_header_lines_s
             # Create new person_visit_id
             person_visit_id = person_id + "_" + visit_occurrence_id
 
-            # Track concepts and patients by year
+            # Track concepts and patients by year or month
             year = strip_hypen(date_str)[0]
-            concept_year_patient[concept_id][year].add(person_visit_id)
-            year_patients[year].add(person_visit_id)
+            month = strip_hypen(date_str)[0] * 100 + strip_hypen(date_str)[1]
+            if window == "year":
+                concept_year_patient[concept_id][year].add(person_visit_id)
+                year_patients[year].add(person_visit_id)
+            elif window == "month":
+                concept_year_patient[concept_id][month].add(person_visit_id)
+                year_patients[month].add(person_visit_id)
 
     # For each patient seen in each year, add the patient's demographics (race, ethnicity, gender)
     for year in year_patients:
@@ -786,4 +791,109 @@ def paired_concept_descriptive_statistics(output_dir, cp_ranged, concept_pairs, 
         mean=np.mean(drug_proc_pair_prevalence), std=np.std(drug_proc_pair_prevalence), 
         min=np.min(drug_proc_pair_prevalence), max=np.max(drug_proc_pair_prevalence))
 
+    fh.close()
+
+def single_concept_yearly_counts(output_dir, cp_data, concepts, year_range, additional_file_label=None):
+    """Writes mean and standard deviation of concept prevalences per year over the specified year range
+    Writes results to file <output_dir>\concept_counts_yearly_<settings>.txt
+    Parameters
+    ----------
+    output_dir: string - Path to folder where the results should be written
+    cp_data: ConceptPatientData
+    concepts: List of int - List of concept IDs to process
+    year_range: tuple of ints - (first year to include, last year to include)
+    randomize: boolean - True, to randomize the mean (standard deviation is not randomized)
+    file_label: String - Additional label for output file
+    """
+    logging.info("Writing single concept yearly deviation...")
+
+    concept_year_patient = cp_data.concept_year_patient
+
+    # Generate the filename based on parameters
+    year_min = year_range[0]
+    year_max = year_range[1]
+    filename = 'concept_yearly_counts_{year_min}-{year_max}_{label}.txt'.format(year_min=year_min,
+            year_max=year_max, label=file_label)
+
+    total_concept = list(concept_year_patient.keys())
+    year_range = list(range(year_min, year_max + 1))
+
+    condition_counts = np.zeros(len(year_range))
+    drug_counts = np.zeros(len(year_range))
+    procedure_counts = np.zeros(len(year_range))
+
+    # Iterate over all concept IDs in concepts
+    for counter, concept_id in enumerate(total_concept):
+        counts = []
+        domain_id = concepts[concept_id]["domain_id"]
+
+        for y in year_range:
+            counts.append(len(concept_year_patient[concept_id][y]))
+
+        if domain_id == "Condition":
+            condition_counts += np.array(counts)
+        elif domain_id == "Drug":
+            drug_counts += np.array(counts)
+        elif domain_id == "Procedure":
+            procedure_counts += np.array(counts)
+
+    # Open csv_writer and write
+    output_file = os.path.join(output_dir, filename)
+    fh, writer = _open_csv_writer(output_file)
+    writer.writerow(year_range)
+    writer.writerow(condition_counts)
+    writer.writerow(drug_counts)
+    writer.writerow(procedure_counts)
+    fh.close()
+
+def single_concept_monthly_counts(output_dir, cp_data, concepts, year_month_range, additional_file_label=None):
+    """Writes mean and standard deviation of concept prevalences per year over the specified year range
+    Writes results to file <output_dir>\concept_counts_yearly_<settings>.txt
+    Parameters
+    ----------
+    output_dir: string - Path to folder where the results should be written
+    cp_data: ConceptPatientData
+    concepts: List of int - List of concept IDs to process
+    year_range: tuple of ints - (first year to include, last year to include)
+    randomize: boolean - True, to randomize the mean (standard deviation is not randomized)
+    file_label: String - Additional label for output file
+    """
+    logging.info("Writing single concept yearly deviation...")
+
+    concept_year_patient = cp_data.concept_year_patient
+
+    # Generate the filename based on parameters
+    year_month_min = year_momth_range[0]
+    year_month_max = year_month_range[-1]
+    filename = 'concept_yearly_counts_{year_month_min}-{year_month_max}_{label}.txt'.format(year_month_min=year_month_min,
+            year_month_max=year_month_max, label=file_label)
+
+    total_concept = list(concept_year_patient.keys())
+
+    condition_counts = np.zeros(len(year_month_range))
+    drug_counts = np.zeros(len(year_month_range))
+    procedure_counts = np.zeros(len(year_month_range))
+
+    # Iterate over all concept IDs in concepts
+    for counter, concept_id in enumerate(total_concept):
+        counts = []
+        domain_id = concepts[concept_id]["domain_id"]
+
+        for ym in year_month_range:
+            counts.append(len(concept_year_patient[concept_id][ym]))
+
+        if domain_id == "Condition":
+            condition_counts += np.array(counts)
+        elif domain_id == "Drug":
+            drug_counts += np.array(counts)
+        elif domain_id == "Procedure":
+            procedure_counts += np.array(counts)
+
+    # Open csv_writer and write
+    output_file = os.path.join(output_dir, filename)
+    fh, writer = _open_csv_writer(output_file)
+    writer.writerow(year_month_range)
+    writer.writerow(condition_counts)
+    writer.writerow(drug_counts)
+    writer.writerow(procedure_counts)
     fh.close()
