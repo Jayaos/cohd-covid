@@ -620,3 +620,66 @@ def paired_concept_ranged_counts(output_dir, cp_ranged, randomize=True, min_coun
     fh.close()
 
     return concept_pairs_exported
+
+def calculate_descriptive_statistics(output_dir, cp_ranged, concepts, additional_file_label=None):
+    """Writes descriptive statistics for the data
+    output_dir: string - Path to folder where the results should be written
+    cp_ranged: ConceptPatientDataMerged
+    """
+
+    # Generate the filename based on parameters
+    concept_patient = cp_ranged.concept_patient
+    year_min = cp_ranged.year_min
+    year_max = cp_ranged.year_max
+    n_pts_str = '_N-%d' % cp_ranged.num_patients
+    range_str = '_%d-%d' % (year_min, year_max)
+    if additional_file_label is not None:
+        additional_file_label = '_' + str(additional_file_label)
+    else:
+        additional_file_label = ''
+    label_str = range_str + n_pts_str + additional_file_label
+    filename = 'descriptive_statistics' + label_str + '.txt'
+
+    # calculate descriptive statistics
+    total_concept = list(concept_patient.keys())
+    condition_concept = []
+    drug_concept = []
+    procedure_concept = []
+
+    for concept in total_concept:
+        if concepts[concept]["domain_id"] == "Condition":
+            condition_concept.append(concept)
+        elif concepts[concept]["domain_id"] == "Drug":
+            drug_concept.append(concept)
+        elif concepts[concept]["domain_id"] == "Procedure":
+            procedure_concept.append(concept)
+
+    condition_prevalence = []
+    drug_prevalence = []
+    procedure_prevalence = []
+
+    for concept in condition_concept:
+        condition_prevalence.append((len(concept_patient[concept]) / cp_ranged.num_patients))
+
+    for concept in drug_concept:
+        drug_prevalence.append((len(concept_patient[concept]) / cp_ranged.num_patients))
+
+    for concept in procedure_concept:
+        precedure_prevalence.append((len(concept_patient[concept]) / cp_ranged.num_patients))
+
+    condition_prevalence = np.array(condition_prevalence)
+    drug_prevalence = np.array(drug_prevalence)
+    procedure_prevalence = np.array(procedure_prevalence)
+
+    output_file = os.path.join(output_dir, filename)
+    fh = open(output_file, 'w')
+    fh.write("total number of concepts : {}\n".format(len(total_concept)))
+    fh.write("total number of condition concepts : {}\n".format(len(condition_concept)))
+    fh.write("total number of drug concepts : {}\n".format(len(drug_concept)))
+    fh.write("total number of procedure concepts : {}\n".format(len(procedure_concept)))
+
+    fh.write("mean, std, min, max of condition concept prevalence : {mean}, {std}, {min}, {max}\n".format(
+        mean=np.mean(condition_prevalence), std=np.std(condition_prevalence), 
+        min=np.min(condition_prevalence), max=np.max(condition_prevalence))
+
+
