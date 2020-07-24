@@ -692,7 +692,7 @@ def single_concept_descriptive_statistics(output_dir, cp_ranged, concepts, addit
 
     fh.close()
 
-def paired_concept_descriptive_statistics(output_dir, cp_ranged, concept_pairs, concepts, file_label=None):
+def paired_concept_descriptive_statistics(output_dir, cp_ranged, concept_pairs, concepts, additional_file_label=None):
     """Writes descriptive statistics for the paired concepts
     output_dir: string - Path to folder where the results should be written
     cp_ranged: ConceptPatientDataMerged
@@ -719,14 +719,71 @@ def paired_concept_descriptive_statistics(output_dir, cp_ranged, concept_pairs, 
     cond_proc_pair_prevalence = []
     drug_proc_pair_prevalence = []
 
-    # Iterate over all concept IDs in concepts
-    for i, (concept_id_1, concept_id_2) in enumerate(concept_pairs):
+    progress = 0
+
+    for counter, (concept_id_1, concept_id_2) in enumerate(concept_pairs):
+
+        if counter % np.ceil(len(concept_pairs) / 100) == 0:
+            progress = progress + 1
+            print("{} percent done")
+
         pair_prevalence = len(set.intersection(concept_patient[concept_id_1], 
         concept_patient[concept_id_2])) / cp_ranged.num_patients
 
         domain_1 = concepts[concept_id_1]["domain_id"]
         domain_2 = concepts[concept_id_2]["domain_id"]
+
         if domain_1 == "Condition" and domain_2 == "Condition":
             cond_cond_pair_prevalence.append(pair_prevalence)
+        elif domain_1 == "Drug" and domain_2 == "Drug":
+            drug_drug_pair_prevalence.append(pair_prevalence)
+        elif domain_1 == "Procedure" and domain_2 == "Procedure":
+            proc_proc_pair_prevalence.append(pair_prevalence)
+        elif (domain_1 == "Condition" and domain_2 == "Procedure") or (domain_1 == "Procedure" and domain_2 == "Condition"):
+            cond_proc_pair_prevalence.append(pair_prevalence)
+        elif (domain_1 == "Condition" and domain_2 == "Drug") or (domain_1 == "Drug" and domain_2 == "Condition"):
+            cond_drug_pair_prevalence.append(pair_prevalence)
+        elif (domain_1 == "Drug" and domain_2 == "Procedure") or (domain_1 == "Procedure" and domain_2 == "Drug"):
+            drug_proc_pair_prevalence.append(pair_prevalence)
 
-    
+    cond_cond_pair_prevalence = np.array(cond_cond_pair_prevalence)
+    drug_drug_pair_prevalence = np.array(drug_drug_pair_prevalence)
+    proc_proc_pair_prevalence = np.array(proc_proc_pair_prevalence)
+    cond_drug_pair_prevalence = np.array(cond_drug_pair_prevalence)
+    cond_proc_pair_prevalence = np.array(cond_proc_pair_prevalence)
+    drug_proc_pair_prevalence = np.array(drug_proc_pair_prevalence)
+
+    output_file = os.path.join(output_dir, filename)
+    fh = open(output_file, 'w')
+    fh.write("total number of cond-cond pairs : {}\n".format(len(cond_cond_pair_prevalence)))
+    fh.write("total number of drug-drug pairs : {}\n".format(len(drug_drug_pair_prevalence)))
+    fh.write("total number of proc-proc pairs : {}\n".format(len(proc_proc_pair_prevalence)))
+    fh.write("total number of cond-drug pairs : {}\n".format(len(cond_drug_pair_prevalence)))
+    fh.write("total number of cond-proc pairs : {}\n".format(len(cond_proc_pair_prevalence)))
+    fh.write("total number of drug-proc pairs : {}\n".format(len(drug_proc_pair_prevalence)))
+
+    fh.write("mean, std, min, max of cond-cond pair prevalence : {mean}, {std}, {min}, {max}\n".format(
+        mean=np.mean(cond_cond_pair_prevalence), std=np.std(cond_cond_pair_prevalence), 
+        min=np.min(cond_cond_pair_prevalence), max=np.max(cond_cond_pair_prevalence))
+
+    fh.write("mean, std, min, max of drug-drug pair prevalence : {mean}, {std}, {min}, {max}\n".format(
+        mean=np.mean(drug_drug_pair_prevalence), std=np.std(drug_drug_pair_prevalence), 
+        min=np.min(drug_drug_pair_prevalence), max=np.max(drug_drug_pair_prevalence))
+
+    fh.write("mean, std, min, max of proc-proc pair prevalence : {mean}, {std}, {min}, {max}\n".format(
+        mean=np.mean(proc_proc_pair_prevalence), std=np.std(proc_proc_pair_prevalence), 
+        min=np.min(proc_proc_pair_prevalence), max=np.max(proc_proc_pair_prevalence))
+
+    fh.write("mean, std, min, max of cond-drug pair prevalence : {mean}, {std}, {min}, {max}\n".format(
+        mean=np.mean(cond_drug_pair_prevalence), std=np.std(cond_drug_pair_prevalence), 
+        min=np.min(cond_drug_pair_prevalence), max=np.max(cond_drug_pair_prevalence))
+
+    fh.write("mean, std, min, max of cond-proc pair prevalence : {mean}, {std}, {min}, {max}\n".format(
+        mean=np.mean(cond_proc_pair_prevalence), std=np.std(cond_proc_pair_prevalence), 
+        min=np.min(cond_proc_pair_prevalence), max=np.max(cond_proc_pair_prevalence))
+
+    fh.write("mean, std, min, max of drug-proc pair prevalence : {mean}, {std}, {min}, {max}\n".format(
+        mean=np.mean(drug_proc_pair_prevalence), std=np.std(drug_proc_pair_prevalence), 
+        min=np.min(drug_proc_pair_prevalence), max=np.max(drug_proc_pair_prevalence))
+
+    fh.close()
