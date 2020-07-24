@@ -621,7 +621,7 @@ def paired_concept_ranged_counts(output_dir, cp_ranged, randomize=True, min_coun
 
     return concept_pairs_exported
 
-def calculate_descriptive_statistics(output_dir, cp_ranged, concepts, additional_file_label=None):
+def single_concept_descriptive_statistics(output_dir, cp_ranged, concepts, additional_file_label=None):
     """Writes descriptive statistics for the data
     output_dir: string - Path to folder where the results should be written
     cp_ranged: ConceptPatientDataMerged
@@ -638,7 +638,7 @@ def calculate_descriptive_statistics(output_dir, cp_ranged, concepts, additional
     else:
         additional_file_label = ''
     label_str = range_str + n_pts_str + additional_file_label
-    filename = 'descriptive_statistics' + label_str + '.txt'
+    filename = 'single_concept_descriptive_statistics' + label_str + '.txt'
 
     # calculate descriptive statistics
     total_concept = list(concept_patient.keys())
@@ -682,4 +682,51 @@ def calculate_descriptive_statistics(output_dir, cp_ranged, concepts, additional
         mean=np.mean(condition_prevalence), std=np.std(condition_prevalence), 
         min=np.min(condition_prevalence), max=np.max(condition_prevalence))
 
+    fh.write("mean, std, min, max of drug concept prevalence : {mean}, {std}, {min}, {max}\n".format(
+        mean=np.mean(drug_prevalence), std=np.std(drug_prevalence), 
+        min=np.min(drug_prevalence), max=np.max(drug_prevalence))
 
+    fh.write("mean, std, min, max of procedure concept prevalence : {mean}, {std}, {min}, {max}\n".format(
+        mean=np.mean(procedure_prevalence), std=np.std(procedure_prevalence), 
+        min=np.min(procedure_prevalence), max=np.max(procedure_prevalence))
+
+    fh.close()
+
+def paired_concept_descriptive_statistics(output_dir, cp_ranged, concept_pairs, concepts, file_label=None):
+    """Writes descriptive statistics for the paired concepts
+    output_dir: string - Path to folder where the results should be written
+    cp_ranged: ConceptPatientDataMerged
+    """
+
+    # Generate the filename based on parameters
+    concept_patient = cp_ranged.concept_patient
+    year_min = cp_ranged.year_min
+    year_max = cp_ranged.year_max
+    n_pts_str = '_N-%d' % cp_ranged.num_patients
+    range_str = '_%d-%d' % (year_min, year_max)
+    if additional_file_label is not None:
+        additional_file_label = '_' + str(additional_file_label)
+    else:
+        additional_file_label = ''
+    label_str = range_str + n_pts_str + additional_file_label
+    filename = 'paired_concept_descriptive_statistics' + label_str + '.txt'
+
+    # calculate descriptive statistics
+    cond_cond_pair_prevalence = []
+    drug_drug_pair_prevalence = []
+    proc_proc_pair_prevalence = []
+    cond_drug_pair_prevalence = []
+    cond_proc_pair_prevalence = []
+    drug_proc_pair_prevalence = []
+
+    # Iterate over all concept IDs in concepts
+    for i, (concept_id_1, concept_id_2) in enumerate(concept_pairs):
+        pair_prevalence = len(set.intersection(concept_patient[concept_id_1], 
+        concept_patient[concept_id_2])) / cp_ranged.num_patients
+
+        domain_1 = concepts[concept_id_1]["domain_id"]
+        domain_2 = concepts[concept_id_2]["domain_id"]
+        if domain_1 == "Condition" and domain_2 == "Condition":
+            cond_cond_pair_prevalence.append(pair_prevalence)
+
+    
