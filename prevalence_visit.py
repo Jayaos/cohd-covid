@@ -844,6 +844,7 @@ def single_concept_yearly_counts(output_dir, cp_data, concepts, year_range, addi
     writer.writerow(condition_counts)
     writer.writerow(drug_counts)
     writer.writerow(procedure_counts)
+
     fh.close()
 
 def single_concept_monthly_counts(output_dir, cp_data, concepts, year_month_range, additional_file_label=None):
@@ -896,4 +897,29 @@ def single_concept_monthly_counts(output_dir, cp_data, concepts, year_month_rang
     writer.writerow(condition_counts)
     writer.writerow(drug_counts)
     writer.writerow(procedure_counts)
+
     fh.close()
+
+def _read_concept_set(data_dir):
+    concept_set = dict()
+    
+    f = open(data_dir, "r")
+    reader = csv.reader(f, delimiter=",")
+    header = reader.next()
+    columns = _find_columns(header, ["Id", "Name", "Domain"])
+    
+    for row in reader:
+        concept_set[int(row[columns[0]])] = (row[columns[1]], row[columns[2]])
+    
+    return concept_set
+
+def build_symptom_dict(input_dir):
+    """Build symptom dictionary from OHDSI concept sets
+    """
+    file_list = os.listdir(input_dir)
+    symptom_dict = dict()
+
+    for f in file_list:
+        symptom_dict[f.split("_")[1]] = _read_concept_set(os.path.join(input_dir, f))
+
+    return symptom_dict
