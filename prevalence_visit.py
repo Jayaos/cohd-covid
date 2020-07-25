@@ -685,15 +685,15 @@ def single_concept_descriptive_statistics(output_dir, cp_ranged, concepts, addit
 
     fh.write("mean, std, min, max of condition concept prevalence : {mean}, {std}, {min}, {max}\n".format(
         mean=np.mean(condition_prevalence), std=np.std(condition_prevalence), 
-        min=np.min(condition_prevalence), max=np.max(condition_prevalence))
+        min=np.min(condition_prevalence), max=np.max(condition_prevalence)))
 
     fh.write("mean, std, min, max of drug concept prevalence : {mean}, {std}, {min}, {max}\n".format(
         mean=np.mean(drug_prevalence), std=np.std(drug_prevalence), 
-        min=np.min(drug_prevalence), max=np.max(drug_prevalence))
+        min=np.min(drug_prevalence), max=np.max(drug_prevalence)))
 
     fh.write("mean, std, min, max of procedure concept prevalence : {mean}, {std}, {min}, {max}\n".format(
         mean=np.mean(procedure_prevalence), std=np.std(procedure_prevalence), 
-        min=np.min(procedure_prevalence), max=np.max(procedure_prevalence))
+        min=np.min(procedure_prevalence), max=np.max(procedure_prevalence)))
 
     fh.close()
 
@@ -769,27 +769,27 @@ def paired_concept_descriptive_statistics(output_dir, cp_ranged, concept_pairs, 
 
     fh.write("mean, std, min, max of cond-cond pair prevalence : {mean}, {std}, {min}, {max}\n".format(
         mean=np.mean(cond_cond_pair_prevalence), std=np.std(cond_cond_pair_prevalence), 
-        min=np.min(cond_cond_pair_prevalence), max=np.max(cond_cond_pair_prevalence))
+        min=np.min(cond_cond_pair_prevalence), max=np.max(cond_cond_pair_prevalence)))
 
     fh.write("mean, std, min, max of drug-drug pair prevalence : {mean}, {std}, {min}, {max}\n".format(
         mean=np.mean(drug_drug_pair_prevalence), std=np.std(drug_drug_pair_prevalence), 
-        min=np.min(drug_drug_pair_prevalence), max=np.max(drug_drug_pair_prevalence))
+        min=np.min(drug_drug_pair_prevalence), max=np.max(drug_drug_pair_prevalence)))
 
     fh.write("mean, std, min, max of proc-proc pair prevalence : {mean}, {std}, {min}, {max}\n".format(
         mean=np.mean(proc_proc_pair_prevalence), std=np.std(proc_proc_pair_prevalence), 
-        min=np.min(proc_proc_pair_prevalence), max=np.max(proc_proc_pair_prevalence))
+        min=np.min(proc_proc_pair_prevalence), max=np.max(proc_proc_pair_prevalence)))
 
     fh.write("mean, std, min, max of cond-drug pair prevalence : {mean}, {std}, {min}, {max}\n".format(
         mean=np.mean(cond_drug_pair_prevalence), std=np.std(cond_drug_pair_prevalence), 
-        min=np.min(cond_drug_pair_prevalence), max=np.max(cond_drug_pair_prevalence))
+        min=np.min(cond_drug_pair_prevalence), max=np.max(cond_drug_pair_prevalence)))
 
     fh.write("mean, std, min, max of cond-proc pair prevalence : {mean}, {std}, {min}, {max}\n".format(
         mean=np.mean(cond_proc_pair_prevalence), std=np.std(cond_proc_pair_prevalence), 
-        min=np.min(cond_proc_pair_prevalence), max=np.max(cond_proc_pair_prevalence))
+        min=np.min(cond_proc_pair_prevalence), max=np.max(cond_proc_pair_prevalence)))
 
     fh.write("mean, std, min, max of drug-proc pair prevalence : {mean}, {std}, {min}, {max}\n".format(
         mean=np.mean(drug_proc_pair_prevalence), std=np.std(drug_proc_pair_prevalence), 
-        min=np.min(drug_proc_pair_prevalence), max=np.max(drug_proc_pair_prevalence))
+        min=np.min(drug_proc_pair_prevalence), max=np.max(drug_proc_pair_prevalence)))
 
     fh.close()
 
