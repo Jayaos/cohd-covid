@@ -11,7 +11,8 @@ from collections import namedtuple
 def strip_hypen(my_date):
     splitted = my_date.split("-")
     year = int(splitted[0])
-    return year, "".join(splitted)
+    month = int(splitted[1])
+    return year, month, "".join(splitted)
 
 def _open_csv_writer(file):
     """Opens a CSV writer
@@ -670,7 +671,7 @@ def single_concept_descriptive_statistics(output_dir, cp_ranged, concepts, addit
         drug_prevalence.append((len(concept_patient[concept]) / cp_ranged.num_patients))
 
     for concept in procedure_concept:
-        precedure_prevalence.append((len(concept_patient[concept]) / cp_ranged.num_patients))
+        procedure_prevalence.append((len(concept_patient[concept]) / cp_ranged.num_patients))
 
     condition_prevalence = np.array(condition_prevalence)
     drug_prevalence = np.array(drug_prevalence)
@@ -730,7 +731,7 @@ def paired_concept_descriptive_statistics(output_dir, cp_ranged, concept_pairs, 
 
         if counter % np.ceil(len(concept_pairs) / 100) == 0:
             progress = progress + 1
-            print("{} percent done")
+            print("{} percent done".format(progress))
 
         pair_prevalence = len(set.intersection(concept_patient[concept_id_1], 
         concept_patient[concept_id_2])) / cp_ranged.num_patients
@@ -855,19 +856,21 @@ def single_concept_monthly_counts(output_dir, cp_data, concepts, year_month_rang
     output_dir: string - Path to folder where the results should be written
     cp_data: ConceptPatientData
     concepts: List of int - List of concept IDs to process
-    year_range: tuple of ints - (first year to include, last year to include)
-    randomize: boolean - True, to randomize the mean (standard deviation is not randomized)
+    year_month_range: list of year_month range as int e.g., [201912, 202001, 202002, 202003, 202004, 202005]
     file_label: String - Additional label for output file
     """
     logging.info("Writing single concept yearly deviation...")
-
     concept_year_patient = cp_data.concept_year_patient
 
     # Generate the filename based on parameters
-    year_month_min = year_momth_range[0]
+    year_month_min = year_month_range[0]
     year_month_max = year_month_range[-1]
+    if additional_file_label is not None:
+        additional_file_label = '_' + str(additional_file_label)
+    else:
+        additional_file_label = ''
     filename = 'concept_yearly_counts_{year_month_min}-{year_month_max}_{label}.txt'.format(year_month_min=year_month_min,
-            year_month_max=year_month_max, label=file_label)
+            year_month_max=year_month_max, label=additional_file_label)
 
     total_concept = list(concept_year_patient.keys())
 
@@ -905,7 +908,7 @@ def _read_concept_set(data_dir):
     
     f = open(data_dir, "r")
     reader = csv.reader(f, delimiter=",")
-    header = reader.next()
+    header = next(reader)
     columns = _find_columns(header, ["Id", "Name", "Domain"])
     
     for row in reader:
@@ -950,7 +953,7 @@ def merge_ranged_symptom(output_dir, cp_ranged, symptom_dict):
 
     return SymptomPatientDataMerged(symptoms_ranged, symptoms_counts, num_patients)
 
-def symptom_counts(output_dir, sp_merged, randomize=True, min_count=11, additional_file_label=None)
+def symptom_counts(output_dir, sp_merged, randomize=True, min_count=11, additional_file_label=None):
     """Writes symptom counts and prevalence
     
     Parameters
@@ -964,7 +967,7 @@ def symptom_counts(output_dir, sp_merged, randomize=True, min_count=11, addition
     # Generate the filename based on parameters
     randomize_str = '_randomized' if randomize else '_unrandomized'
     min_count_str = '_mincount-%d' % min_count
-    timestamp = '_' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    timestamp = '_' + datetime.now().strftime("%Y%m%d-%H%M%S")
     filename = 'symptom_counts' + randomize_str + min_count_str + timestamp + '.txt'
     
     # Open csv_writer and write header
@@ -972,14 +975,14 @@ def symptom_counts(output_dir, sp_merged, randomize=True, min_count=11, addition
     fh, writer = _open_csv_writer(output_file)
     writer.writerow(['symptom', 'num_nonzero', 'count', 'prevalence'])
 
-    symptoms_ranged = sp_merged.symptoms_ranged
-    symptoms_counts = sp_merged.symptoms_counts
+    symptom_patient = sp_merged.symptom_patient
+    symptom_counts = sp_merged.nonzero_count
     num_patients = sp_merged.num_patients
-    symptoms = list(sp_merged.symptoms_ranged.keys())
+    symptoms = list(symptom_patient.keys())
 
     for symptom in symptoms:
-        npts = len(symptoms_ranged[symptom])
-        nonzero_counts = symptoms_counts[symptom]
+        npts = len(symptom_patient[symptom])
+        nonzero_counts = symptom_counts[symptom]
 
         # Exclude concepts with low counts
         if npts < min_count:
