@@ -923,3 +923,73 @@ def build_symptom_dict(input_dir):
         symptom_dict[f.split("_")[1]] = _read_concept_set(os.path.join(input_dir, f))
 
     return symptom_dict
+
+def merge_ranged_symptom(output_dir, cp_ranged, symptom_dict):
+    
+    # Create a new namedtuple for recording data
+    SymptomPatientDataMerged = namedtuple('SymptomPatientDataMerged', 
+    ['symptom_patient', 'nonzero_count', 'num_patients'])
+    
+    concept_patient = cp_ranged.concept_patient
+    num_patients = cp_ranged.num_patients
+    symptoms_ranged = defaultdict(set)
+    symptoms_counts = defaultdict()
+
+    for i, symptom in enumerate(list(symptom_dict.keys())):
+        concepts = list(symptom_dict[symptom].keys())
+        pts_merged = []
+        nonzero_counts = 0
+
+        for concept in concepts:
+            pts_merged.extend(list(concept_patient[concept]))
+            if len(list(concept_patient[concept])) > 0:
+                nonzero_counts += 1
+
+        symptoms_ranged[symptom] = set(pts_merged)
+        symptoms_counts[symptom] = nonzero_counts
+
+    return SymptomPatientDataMerged(symptoms_ranged, symptoms_counts, num_patients)
+
+def symptom_counts(output_dir, sp_merged, randomize=True, min_count=11, additional_file_label=None)
+    """Writes symptom counts and prevalence
+    
+    Parameters
+    ----------
+    output_dir: string - Path to folder where the results should be written
+    sp_merged: SymptomPatientDataMerged
+    randomize: logical - True to randomize counts using Poisson (default: True)
+    min_count: int - Minimum count to be included in results (inclusive, default: 11)
+    """
+
+    # Generate the filename based on parameters
+    randomize_str = '_randomized' if randomize else '_unrandomized'
+    min_count_str = '_mincount-%d' % min_count
+    timestamp = '_' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    filename = 'symptom_counts' + randomize_str + min_count_str + timestamp + '.txt'
+    
+    # Open csv_writer and write header
+    output_file = os.path.join(output_dir, filename)
+    fh, writer = _open_csv_writer(output_file)
+    writer.writerow(['symptom', 'num_nonzero', 'count', 'prevalence'])
+
+    symptoms_ranged = sp_merged.symptoms_ranged
+    symptoms_counts = sp_merged.symptoms_counts
+    num_patients = sp_merged.num_patients
+    symptoms = list(sp_merged.symptoms_ranged.keys())
+
+    for symptom in symptoms:
+        npts = len(symptoms_ranged[symptom])
+        nonzero_counts = symptoms_counts[symptom]
+
+        # Exclude concepts with low counts
+        if npts < min_count:
+            continue
+        
+        # Randomize counts
+        if randomize:
+            npts = np.random.poisson(npts)
+
+        # Write to file
+        writer.writerow([symptom, nonzero_counts, npts, npts/num_patients])
+    
+    fh.close()
