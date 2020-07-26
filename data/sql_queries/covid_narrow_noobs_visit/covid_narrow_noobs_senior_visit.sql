@@ -1018,7 +1018,7 @@ WHERE condition_concept_id != 0
 	AND i.concept_id IS NULL		-- Make sure condition is not an iatrogenic code
 	AND person_id in (SELECT person_id FROM #target_cohort)
 	AND condition_start_date > '2019-12-01'
-  AND visit_occurrence_id IS NOT NULL
+  AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)
 UNION ALL
 SELECT DISTINCT de.person_id, de.drug_exposure_start_date AS date, de.drug_concept_id AS concept_id, de.visit_occurrence_id
 FROM drug_exposure de
@@ -1029,7 +1029,7 @@ WHERE drug_concept_id != 0
 	AND i.concept_id IS NULL	-- Make sure condition is not an iatrogenic code
 	AND person_id in (SELECT person_id FROM #target_cohort)
 	AND drug_exposure_start_date > '2019-12-01'
-  AND visit_occurrence_id IS NOT NULL
+  AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)
 UNION ALL
 SELECT DISTINCT po.person_id, po.procedure_date AS date, po.procedure_concept_id AS concept_id, po.visit_occurrence_id
 FROM procedure_occurrence po
@@ -1040,7 +1040,7 @@ WHERE procedure_concept_id != 0
 	AND i.concept_id IS NULL		-- Make sure condition is not an iatrogenic code;
   AND person_id in (SELECT person_id FROM #target_cohort)
   AND procedure_date > '2019-12-01'
-  AND visit_occurrence_id IS NOT NULL
+  AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)
 ;
 
 TRUNCATE TABLE #strategy_ends;
