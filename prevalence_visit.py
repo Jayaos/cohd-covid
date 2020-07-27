@@ -627,7 +627,7 @@ def paired_concept_ranged_counts(output_dir, cp_ranged, randomize=True, min_coun
 
     return concept_pairs_exported
 
-def single_concept_descriptive_statistics(output_dir, cp_ranged, concepts, additional_file_label=None):
+def single_concept_descriptive_statistics(output_dir, cp_ranged, single_concepts, concepts, additional_file_label=None):
     """Writes descriptive statistics for the data
     output_dir: string - Path to folder where the results should be written
     cp_ranged: ConceptPatientDataMerged
@@ -647,7 +647,7 @@ def single_concept_descriptive_statistics(output_dir, cp_ranged, concepts, addit
     filename = 'single_concept_descriptive_statistics' + label_str + '.txt'
 
     # calculate descriptive statistics
-    total_concept = list(concept_patient.keys())
+    total_concept = single_concepts
     condition_concept = []
     drug_concept = []
     procedure_concept = []
@@ -806,17 +806,21 @@ def single_concept_yearly_counts(output_dir, cp_data, concepts, year_range, addi
     randomize: boolean - True, to randomize the mean (standard deviation is not randomized)
     file_label: String - Additional label for output file
     """
-    logging.info("Writing single concept yearly deviation...")
+    logging.info("Writing single concept yearly count...")
 
     concept_year_patient = cp_data.concept_year_patient
 
     # Generate the filename based on parameters
     year_min = year_range[0]
     year_max = year_range[1]
+    if additional_file_label is not None:
+        additional_file_label = '_' + str(additional_file_label)
+    else:
+        additional_file_label = ''
     filename = 'concept_yearly_counts_{year_min}-{year_max}_{label}.txt'.format(year_min=year_min,
-            year_max=year_max, label=file_label)
+            year_max=year_max, label=additional_file_label)
 
-    total_concept = list(concept_year_patient.keys())
+    total_concept = list(concepts.keys())
     year_range = list(range(year_min, year_max + 1))
 
     condition_counts = np.zeros(len(year_range))
