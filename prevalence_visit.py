@@ -957,7 +957,7 @@ def merge_ranged_symptom(output_dir, cp_ranged, symptom_dict):
 
     return SymptomPatientDataMerged(symptoms_ranged, symptoms_counts, num_patients)
 
-def symptom_counts(output_dir, sp_merged, randomize=True, min_count=11, additional_file_label=None):
+def symptom_counts(output_dir, sp_merged, randomize=True, min_count=11):
     """Writes symptom counts and prevalence
     
     Parameters
@@ -999,4 +999,123 @@ def symptom_counts(output_dir, sp_merged, randomize=True, min_count=11, addition
         # Write to file
         writer.writerow([symptom, nonzero_counts, npts, npts/num_patients])
     
+    fh.close()
+
+def single_concept_yearly_deviation(output_dir, cp_data, single_concepts, year_range, randomize=True):
+    """Writes mean and standard deviation of concept prevalences per year over the specified year range
+    Writes results to file <output_dir>\concept_counts_yearly_<settings>.txt
+    Parameters
+    ----------
+    output_dir: string - Path to folder where the results should be written
+    cp_data: ConceptPatientData
+    single_concepts: List of int - List of concept IDs to process (output of single_concept_ranged_counts)
+    year_range: tuple of ints - (first year to include, last year to include)
+    randomize: boolean - True, to randomize the mean (standard deviation is not randomized)
+    file_label: String - Additional label for output file
+    """
+    logging.info("Writing single concept yearly deviation...")
+
+    concept_year_patient = cp_data.concept_year_patient
+    year_numpatients = cp_data.year_numpatients
+
+    # Generate the filename based on parameters
+    year_min = year_range[0]
+    year_max = year_range[1]
+    randomize_label = 'randomized' if randomize else 'nonrandomized'
+    filename = 'concept_yearly_deviation_{year_min}-{year_max}_{randomize}.txt'.format(year_min=year_min,
+            year_max=year_max, randomize=randomize_label)
+
+    # Open csv_writer and write header
+    output_file = os.path.join(output_dir, filename)
+    fh, writer = _open_csv_writer(output_file)
+    writer.writerow(['concept_id', 'mean', 'std'])
+
+    # Get the number of patients per year
+    ppy = numpy.array([year_numpatients[y] for y in range(year_min, year_max + 1)], dtype=float)
+
+    progress = 0
+    # Iterate over all concept IDs in concepts
+    for counter, concept_id in enumerate(single_concepts):
+
+        if counter % np.ceil(len(single_concepts) / 100) == 0:
+            progress = progress + 1
+            print("{} percent done".format(progress))
+
+        # Get the counts for this concept in each year
+        yp = concept_year_patient[concept_id]  # year-patient data for concept_id
+        counts = numpy.array([len(yp[y]) for y in range(year_min, year_max + 1)], dtype=float)
+
+        # Calculate standard deviation of the true prevalence rates
+        s = numpy.std(counts / ppy)
+
+        # Randomize each annual count
+        if randomize:
+            counts = numpy.random.poisson(counts)
+
+        # Calculate the mean of the (maybe randomized) prevalence rates
+        m = numpy.mean(counts / ppy)
+
+        # Write concept_id, mean, and standard deviation to file
+        writer.writerow([concept_id, m, s])
+
+    fh.close()
+
+def paired_concept_yearly_deviation(output_dir, cp_data, concept_pairs, year_range, randomize=True):
+    """Writes mean and standard deviation of concept pair co-occurrences per year over the specified year range
+    Writes results to file <output_dir>\concept_counts_yearly_<settings>.txt
+    Parameters
+    ----------
+    output_dir: string - Path to folder where the results should be written
+    cp_data: ConceptPatientData
+    concept_pairs: List of tuples of int - List of concept ID pairs to process (output of paired_concept_ranged_counts)
+    year_range: tuple of ints - (first year to include, last year to include)
+    randomize: boolean - True, to randomize the mean (standard deviation is not randomized)
+    file_label: String - Additional label for output file
+    """
+    logging.info("Writing concept pairs yearly deviation...")
+
+    concept_year_patient = cp_data.concept_year_patient
+    year_numpatients = cp_data.year_numpatients
+
+    # Generate the filename based on parameters
+    year_min = year_range[0]
+    year_max = year_range[1]
+    randomize_label = 'randomized' if randomize else 'nonrandomized'
+    filename = 'concept_pair_yearly_deviation_{year_min}-{year_max}_{randomize}.txt'.format(year_min=year_min,
+            year_max=year_max, randomize=randomize_label)
+
+    # Open csv_writer and write header
+    output_file = os.path.join(output_dir, filename)
+    fh, writer = _open_csv_writer(output_file)
+    writer.writerow(['concept_id1', 'concept_id2', 'mean', 'std'])
+
+    # Get the number of patients per year
+    ppy = numpy.array([year_numpatients[y] for y in range(year_min, year_max + 1)], dtype=float)
+
+    progress = 0
+    # Iterate over all concept IDs in concepts
+    for counter, (concept_id_1, concept_id_2) in enumerate(concept_pairs):
+
+        if counter % np.ceil(len(concept_pairs) / 100) == 0:
+            progress = progress + 1
+            print("{} percent done".format(progress))
+
+        # Get the co-occurrence rates for these concepts in each year
+        yp1 = concept_year_patient[concept_id_1]  # year-patient data for concept_id_1
+        yp2 = concept_year_patient[concept_id_2]  # year-patient data for concept_id_2
+        counts = numpy.array([len(yp1[y] & yp2[y]) for y in range(year_min, year_max + 1)], dtype=float)
+
+        # Calculate standard deviation of the true prevalence rates
+        s = numpy.std(counts / ppy)
+
+        # Randomize each annual count
+        if randomize:
+            counts = numpy.random.poisson(counts)
+
+        # Calculate the mean of the (maybe randomized) prevalence rates
+        m = numpy.mean(counts / ppy)
+
+        # Write concept_id, mean, and standard deviation to file
+        writer.writerow([concept_id_1, concept_id_2, m, s])
+
     fh.close()
