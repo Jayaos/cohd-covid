@@ -244,10 +244,17 @@ FROM dbo.visit_occurrence
 WHERE visit_start_date > '2014-09-01' AND visit_start_date < '2019-04-01' 
 AND visit_concept_id in (SELECT concept_id FROM #hospitalization_concept)
 
+--Demographic criteria
+SELECT visit_occurrence_id, pr.person_id, visit_start_date, P.year_of_birth, P.gender_concept_id
+INTO #demo_table
+FROM #patient_range pr
+LEFT JOIN dbo.person P ON pr.person_id = P.person_id
+
 --Create target cohort
 SELECT DISTINCT person_id
 INTO #target_cohort
-FROM #patient_range
+FROM #demo_table
+WHERE YEAR(visit_start_date) - year_of_birth >= 18 AND (gender_concept_id = 8532 OR gender_concept_id = 8507)
 
 -- Export person ID, start date, and concept IDs for conditions, drugs, and procedures
 :OUT D:\cohd\general_1419.txt
@@ -260,7 +267,7 @@ WHERE condition_concept_id != 0
 	AND i.concept_id IS NULL		-- Make sure condition is not an iatrogenic code
 	AND person_id in (SELECT person_id FROM #target_cohort)
 	AND condition_start_date > '2014-09-01' AND condition_start_date < '2019-04-01'
-	AND visit_occurrence_id IS NOT NULL
+	AND visit_occurrence_id IN (SELECT visit_occurrence_id FROM #demo_table)
 UNION ALL
 SELECT DISTINCT de.person_id, de.drug_exposure_start_date AS date, de.drug_concept_id AS concept_id, de.visit_occurrence_id
 FROM drug_exposure de
@@ -271,7 +278,7 @@ WHERE drug_concept_id != 0
 	AND i.concept_id IS NULL	-- Make sure condition is not an iatrogenic code
 	AND person_id in (SELECT person_id FROM #target_cohort)
 	AND drug_exposure_start_date > '2014-09-01' AND drug_exposure_start_date < '2019-04-01'
-	AND visit_occurrence_id IS NOT NULL
+	AND visit_occurrence_id IN (SELECT visit_occurrence_id FROM #demo_table)
 UNION ALL
 SELECT DISTINCT po.person_id, po.procedure_date AS date, po.procedure_concept_id AS concept_id, po.visit_occurrence_id
 FROM procedure_occurrence po
@@ -281,8 +288,8 @@ WHERE procedure_concept_id != 0
 	AND c.domain_id = 'Procedure'	-- Make sure we only get conditions from the condition_occurrence table
 	AND i.concept_id IS NULL		-- Make sure condition is not an iatrogenic code;
     AND person_id in (SELECT person_id FROM #target_cohort)
-    AND procedure_date > '2014-01-01' AND procedure_date < '2019-12-31'
-	AND visit_occurrence_id IS NOT NULL
+    AND procedure_date > '2014-09-01' AND procedure_date < '2019-04-01'
+	AND visit_occurrence_id IN (SELECT visit_occurrence_id FROM #demo_table)
 ;
 
 DROP TABLE #hospitalization_concept;
@@ -290,3 +297,4 @@ DROP TABLE #patient_range;
 DROP TABLE #target_cohort;
 DROP TABLE #iatrogenic_codes;
 DROP TABLE #iatrogenic_codes_with_desc;
+DROP TABLE #demo_table;
