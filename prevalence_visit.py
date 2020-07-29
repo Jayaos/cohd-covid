@@ -1031,7 +1031,7 @@ def single_concept_yearly_deviation(output_dir, cp_data, single_concepts, year_r
     writer.writerow(['concept_id', 'mean', 'std'])
 
     # Get the number of patients per year
-    ppy = numpy.array([year_numpatients[y] for y in range(year_min, year_max + 1)], dtype=float)
+    ppy = np.array([year_numpatients[y] for y in range(year_min, year_max + 1)], dtype=float)
 
     progress = 0
     # Iterate over all concept IDs in concepts
@@ -1043,17 +1043,17 @@ def single_concept_yearly_deviation(output_dir, cp_data, single_concepts, year_r
 
         # Get the counts for this concept in each year
         yp = concept_year_patient[concept_id]  # year-patient data for concept_id
-        counts = numpy.array([len(yp[y]) for y in range(year_min, year_max + 1)], dtype=float)
+        counts = np.array([len(yp[y]) for y in range(year_min, year_max + 1)], dtype=float)
 
         # Calculate standard deviation of the true prevalence rates
-        s = numpy.std(counts / ppy)
+        s = np.std(counts / ppy)
 
         # Randomize each annual count
         if randomize:
-            counts = numpy.random.poisson(counts)
+            counts = np.random.poisson(counts)
 
         # Calculate the mean of the (maybe randomized) prevalence rates
-        m = numpy.mean(counts / ppy)
+        m = np.mean(counts / ppy)
 
         # Write concept_id, mean, and standard deviation to file
         writer.writerow([concept_id, m, s])
@@ -1090,7 +1090,7 @@ def paired_concept_yearly_deviation(output_dir, cp_data, concept_pairs, year_ran
     writer.writerow(['concept_id1', 'concept_id2', 'mean', 'std'])
 
     # Get the number of patients per year
-    ppy = numpy.array([year_numpatients[y] for y in range(year_min, year_max + 1)], dtype=float)
+    ppy = np.array([year_numpatients[y] for y in range(year_min, year_max + 1)], dtype=float)
 
     progress = 0
     # Iterate over all concept IDs in concepts
@@ -1103,17 +1103,17 @@ def paired_concept_yearly_deviation(output_dir, cp_data, concept_pairs, year_ran
         # Get the co-occurrence rates for these concepts in each year
         yp1 = concept_year_patient[concept_id_1]  # year-patient data for concept_id_1
         yp2 = concept_year_patient[concept_id_2]  # year-patient data for concept_id_2
-        counts = numpy.array([len(yp1[y] & yp2[y]) for y in range(year_min, year_max + 1)], dtype=float)
+        counts = np.array([len(yp1[y] & yp2[y]) for y in range(year_min, year_max + 1)], dtype=float)
 
         # Calculate standard deviation of the true prevalence rates
-        s = numpy.std(counts / ppy)
+        s = np.std(counts / ppy)
 
         # Randomize each annual count
         if randomize:
-            counts = numpy.random.poisson(counts)
+            counts = np.random.poisson(counts)
 
         # Calculate the mean of the (maybe randomized) prevalence rates
-        m = numpy.mean(counts / ppy)
+        m = np.mean(counts / ppy)
 
         # Write concept_id, mean, and standard deviation to file
         writer.writerow([concept_id_1, concept_id_2, m, s])
