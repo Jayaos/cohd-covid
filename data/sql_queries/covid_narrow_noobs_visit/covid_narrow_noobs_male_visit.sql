@@ -542,7 +542,7 @@ FROM
 SELECT 0 as index_id, e.person_id, e.event_id
 FROM #qualified_events E
 JOIN dbo.PERSON P ON P.PERSON_ID = E.PERSON_ID
-WHERE YEAR(E.start_date) - P.year_of_birth >= 18 AND P.gender_concept_id = 8507
+WHERE YEAR(E.start_date) - P.year_of_birth >= 18 AND (P.gender_concept_id = 8507 OR P.gender_concept_id = 8532)
 GROUP BY e.person_id, e.event_id
 -- End Demographic Criteria
 
@@ -1004,11 +1004,9 @@ from cteEnds
 group by person_id, end_date
 ;
 
-SELECT DISTINCT person_id INTO #target_cohort
-FROM #final_cohort;
-
--- Export person ID, start date, and concept IDs for conditions, drugs, and procedures
-:OUT D:\cohd\covid_narrow_noobs_male.txt
+SELECT *
+INTO #concept_table
+FROM (
 SELECT DISTINCT co.person_id, co.condition_start_date AS date, co.condition_concept_id AS concept_id, co.visit_occurrence_id
 FROM condition_occurrence co
 JOIN concept c ON co.condition_concept_id = c.concept_id
@@ -1016,7 +1014,7 @@ LEFT JOIN #iatrogenic_codes_with_desc i ON c.concept_id = i.concept_id
 WHERE condition_concept_id != 0 
 	AND c.domain_id = 'Condition'	-- Make sure we only get conditions from the condition_occurrence table
 	AND i.concept_id IS NULL		-- Make sure condition is not an iatrogenic code
-	AND person_id in (SELECT person_id FROM #target_cohort)
+	AND person_id in (SELECT person_id FROM #final_cohort)
 	AND condition_start_date > '2019-12-01'
   AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)
 UNION ALL
@@ -1027,7 +1025,7 @@ LEFT JOIN #iatrogenic_codes_with_desc i ON c.concept_id = i.concept_id
 WHERE drug_concept_id != 0 
 	AND c.domain_id = 'Drug'	-- Make sure we only get conditions from the condition_occurrence table
 	AND i.concept_id IS NULL	-- Make sure condition is not an iatrogenic code
-	AND person_id in (SELECT person_id FROM #target_cohort)
+	AND person_id in (SELECT person_id FROM #final_cohort)
 	AND drug_exposure_start_date > '2019-12-01'
   AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)
 UNION ALL
@@ -1038,10 +1036,41 @@ LEFT JOIN #iatrogenic_codes_with_desc i ON c.concept_id = i.concept_id
 WHERE procedure_concept_id != 0 
 	AND c.domain_id = 'Procedure'	-- Make sure we only get conditions from the condition_occurrence table
 	AND i.concept_id IS NULL		-- Make sure condition is not an iatrogenic code;
-  AND person_id in (SELECT person_id FROM #target_cohort)
+  AND person_id in (SELECT person_id FROM #final_cohort)
   AND procedure_date > '2019-12-01'
-  AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)
+  AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)) as tmp
 ;
+
+SELECT C.*, P.year_of_birth, P.gender_concept_id
+INTO #final_data
+FROM #concept_table C
+LEFT JOIN dbo.person P ON P.person_id = C.person_id
+
+SELECT DISTINCT person_id
+INTO #adult_cohort
+FROM #final_data
+WHERE 2020 - year_of_birth >= 18 AND 2020 - year_of_birth < 65
+
+SELECT DISTINCT person_id
+INTO #senior_cohort
+FROM #final_data
+WHERE 2020 - year_of_birth >= 65
+
+SELECT DISTINCT person_id
+INTO #female_cohort
+FROM #final_data
+WHERE gender_concept_id = 8532
+
+SELECT DISTINCT person_id
+INTO #male_cohort
+FROM #final_data
+WHERE gender_concept_id = 8507
+
+-- Export person ID, start date, and concept IDs for conditions, drugs, and procedures
+:OUT D:\cohd\covid_narrow_noobs_male.txt
+SELECT person_id, date, concept_id, visit_occurrence_id
+FROM #final_data
+WHERE person_id in (SELECT * FROM #male_cohort)
 
 TRUNCATE TABLE #strategy_ends;
 DROP TABLE #strategy_ends;
@@ -1070,5 +1099,20 @@ DROP TABLE #iatrogenic_codes;
 TRUNCATE TABLE #iatrogenic_codes_with_desc;
 DROP TABLE #iatrogenic_codes_with_desc;
 
-TRUNCATE TABLE #target_cohort;
-DROP TABLE #target_cohort;
+TRUNCATE TABLE #final_data;
+DROP TABLE #final_data;
+
+TRUNCATE TABLE #concept_table;
+DROP TABLE #concept_table;
+
+TRUNCATE TABLE #female_cohort;
+DROP TABLE #female_cohort;
+
+TRUNCATE TABLE #male_cohort;
+DROP TABLE #male_cohort;
+
+TRUNCATE TABLE #adult_cohort;
+DROP TABLE #adult_cohort;
+
+TRUNCATE TABLE #senior_cohort;
+DROP TABLE #senior_cohort;
