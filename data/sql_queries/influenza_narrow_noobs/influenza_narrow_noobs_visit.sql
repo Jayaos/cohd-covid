@@ -330,7 +330,7 @@ from
 JOIN #Codesets codesets on ((vo.visit_concept_id = codesets.concept_id and codesets.codeset_id = 4))
 ) C
 
-WHERE (C.visit_start_date >= DATEFROMPARTS(2014, 09, 01) and C.visit_start_date <= DATEFROMPARTS(2019, 04, 01))
+WHERE (C.visit_start_date >= DATEFROMPARTS(2014, 01, 01) and C.visit_start_date <= DATEFROMPARTS(2019, 12, 31))
 -- End Visit Occurrence Criteria
 
   ) E
@@ -872,8 +872,10 @@ SELECT DISTINCT person_id INTO #target_cohort
 FROM #final_cohort;
 
 -- Export person ID, start date, and concept IDs for conditions, drugs, and procedures
-:OUT D:\cohd\influenza_narrow_1419.txt
-SELECT DISTINCT co.person_id, co.condition_start_date AS date, co.condition_concept_id AS concept_id, co.visit_occurrence_id
+SELECT *
+INTO #final_data
+FROM
+(SELECT DISTINCT co.person_id, co.condition_start_date AS date, co.condition_concept_id AS concept_id, co.visit_occurrence_id
 FROM condition_occurrence co
 JOIN concept c ON co.condition_concept_id = c.concept_id
 LEFT JOIN #iatrogenic_codes_with_desc i ON c.concept_id = i.concept_id
@@ -881,7 +883,7 @@ WHERE condition_concept_id != 0
 	AND c.domain_id = 'Condition'	-- Make sure we only get conditions from the condition_occurrence table
 	AND i.concept_id IS NULL		-- Make sure condition is not an iatrogenic code
 	AND person_id in (SELECT person_id FROM #target_cohort)
-	AND condition_start_date > '2014-09-01' AND condition_start_date < '2019-04-01'
+	AND condition_start_date >= '2014-01-01' AND condition_start_date <= '2019-12-31'
 	AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)
 UNION ALL
 SELECT DISTINCT de.person_id, de.drug_exposure_start_date AS date, de.drug_concept_id AS concept_id, de.visit_occurrence_id
@@ -892,7 +894,7 @@ WHERE drug_concept_id != 0
 	AND c.domain_id = 'Drug'	-- Make sure we only get conditions from the condition_occurrence table
 	AND i.concept_id IS NULL	-- Make sure condition is not an iatrogenic code
 	AND person_id in (SELECT person_id FROM #target_cohort)
-	AND drug_exposure_start_date > '2014-09-01' AND drug_exposure_start_date < '2019-04-01'
+	AND drug_exposure_start_date >= '2014-01-01' AND drug_exposure_start_date <= '2019-12-31'
 	AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)
 UNION ALL
 SELECT DISTINCT po.person_id, po.procedure_date AS date, po.procedure_concept_id AS concept_id, po.visit_occurrence_id
@@ -903,9 +905,13 @@ WHERE procedure_concept_id != 0
 	AND c.domain_id = 'Procedure'	-- Make sure we only get conditions from the condition_occurrence table
 	AND i.concept_id IS NULL		-- Make sure condition is not an iatrogenic code;
   AND person_id in (SELECT person_id FROM #target_cohort)
-  AND procedure_date > '2014-09-01' AND procedure_date < '2019-04-01'
-	AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)
+  AND procedure_date >= '2014-01-01' AND procedure_date <= '2019-12-31'
+	AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)) as tmp
 ;
+
+:OUT D:\cohd\influenza_narrow_1419.txt
+SELECT *
+FROM #final_data 
 
 TRUNCATE TABLE #strategy_ends;
 DROP TABLE #strategy_ends;
@@ -936,3 +942,6 @@ DROP TABLE #iatrogenic_codes_with_desc;
 
 TRUNCATE TABLE #target_cohort;
 DROP TABLE #target_cohort;
+
+TRUNCATE TABLE #final_data;
+DROP TABLE #final_data;

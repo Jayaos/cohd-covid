@@ -241,7 +241,7 @@ FROM dbo.CONCEPT c
 SELECT visit_occurrence_id, person_id, visit_start_date
 INTO #patient_range
 FROM dbo.visit_occurrence
-WHERE visit_start_date > '2014-09-01' AND visit_start_date < '2019-04-01' 
+WHERE visit_start_date >= '2014-01-01' AND visit_start_date <= '2019-12-31' 
 AND visit_concept_id in (SELECT concept_id FROM #hospitalization_concept)
 
 --Demographic criteria
@@ -266,7 +266,7 @@ WHERE condition_concept_id != 0
 	AND c.domain_id = 'Condition'	-- Make sure we only get conditions from the condition_occurrence table
 	AND i.concept_id IS NULL		-- Make sure condition is not an iatrogenic code
 	AND person_id in (SELECT person_id FROM #target_cohort)
-	AND condition_start_date > '2014-09-01' AND condition_start_date < '2019-04-01'
+	AND condition_start_date >= '2014-01-01' AND condition_start_date <= '2019-12-31'
 	AND visit_occurrence_id IN (SELECT visit_occurrence_id FROM #demo_table)
 UNION ALL
 SELECT DISTINCT de.person_id, de.drug_exposure_start_date AS date, de.drug_concept_id AS concept_id, de.visit_occurrence_id
@@ -277,7 +277,7 @@ WHERE drug_concept_id != 0
 	AND c.domain_id = 'Drug'	-- Make sure we only get conditions from the condition_occurrence table
 	AND i.concept_id IS NULL	-- Make sure condition is not an iatrogenic code
 	AND person_id in (SELECT person_id FROM #target_cohort)
-	AND drug_exposure_start_date > '2014-09-01' AND drug_exposure_start_date < '2019-04-01'
+	AND drug_exposure_start_date >= '2014-01-01' AND drug_exposure_start_date <= '2019-12-31'
 	AND visit_occurrence_id IN (SELECT visit_occurrence_id FROM #demo_table)
 UNION ALL
 SELECT DISTINCT po.person_id, po.procedure_date AS date, po.procedure_concept_id AS concept_id, po.visit_occurrence_id
@@ -288,7 +288,7 @@ WHERE procedure_concept_id != 0
 	AND c.domain_id = 'Procedure'	-- Make sure we only get conditions from the condition_occurrence table
 	AND i.concept_id IS NULL		-- Make sure condition is not an iatrogenic code;
     AND person_id in (SELECT person_id FROM #target_cohort)
-    AND procedure_date > '2014-09-01' AND procedure_date < '2019-04-01'
+    AND procedure_date >= '2014-01-01' AND procedure_date <= '2019-12-31'
 	AND visit_occurrence_id IN (SELECT visit_occurrence_id FROM #demo_table)
 ;
 
