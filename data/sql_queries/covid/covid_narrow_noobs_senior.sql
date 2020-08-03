@@ -332,7 +332,7 @@ from
 JOIN #Codesets codesets on ((vo.visit_concept_id = codesets.concept_id and codesets.codeset_id = 4))
 ) C
 
-WHERE C.visit_start_date > DATEFROMPARTS(2019, 12, 01)
+WHERE C.visit_start_date > DATEFROMPARTS(2020, 03, 01)
 -- End Visit Occurrence Criteria
 
   ) E
@@ -1015,7 +1015,7 @@ WHERE condition_concept_id != 0
 	AND c.domain_id = 'Condition'	-- Make sure we only get conditions from the condition_occurrence table
 	AND i.concept_id IS NULL		-- Make sure condition is not an iatrogenic code
 	AND person_id in (SELECT person_id FROM #final_cohort)
-	AND condition_start_date > '2019-12-01'
+	AND condition_start_date > '2020-03-01'
   AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)
 UNION ALL
 SELECT DISTINCT de.person_id, de.drug_exposure_start_date AS date, de.drug_concept_id AS concept_id, de.visit_occurrence_id
@@ -1026,7 +1026,7 @@ WHERE drug_concept_id != 0
 	AND c.domain_id = 'Drug'	-- Make sure we only get conditions from the condition_occurrence table
 	AND i.concept_id IS NULL	-- Make sure condition is not an iatrogenic code
 	AND person_id in (SELECT person_id FROM #final_cohort)
-	AND drug_exposure_start_date > '2019-12-01'
+	AND drug_exposure_start_date > '2020-03-01'
   AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)
 UNION ALL
 SELECT DISTINCT po.person_id, po.procedure_date AS date, po.procedure_concept_id AS concept_id, po.visit_occurrence_id
@@ -1037,7 +1037,7 @@ WHERE procedure_concept_id != 0
 	AND c.domain_id = 'Procedure'	-- Make sure we only get conditions from the condition_occurrence table
 	AND i.concept_id IS NULL		-- Make sure condition is not an iatrogenic code;
   AND person_id in (SELECT person_id FROM #final_cohort)
-  AND procedure_date > '2019-12-01'
+  AND procedure_date > '2020-03-01'
   AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)) as tmp
 ;
 
@@ -1067,10 +1067,10 @@ FROM #final_data
 WHERE gender_concept_id = 8507
 
 -- Export person ID, start date, and concept IDs for conditions, drugs, and procedures
-:OUT D:\cohd\covid_narrow_noobs_male.txt
+:OUT D:\cohd\covid_narrow_noobs_senior.txt
 SELECT person_id, date, concept_id, visit_occurrence_id
 FROM #final_data
-WHERE person_id in (SELECT * FROM #male_cohort)
+WHERE person_id in (SELECT * FROM #senior_cohort)
 
 TRUNCATE TABLE #strategy_ends;
 DROP TABLE #strategy_ends;
