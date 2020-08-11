@@ -20,15 +20,38 @@ def build_prevalence_dict(concept_count, num_people, database="ssms"):
         if len(row) == table_width:
             concept_id, count = [row[i] for i in columns]
             count = int(count)
-            count_dict[concept_id] = count
-            prev_dict[concept_id] = count / num_people
+            count_dict[int(concept_id)] = count
+            prev_dict[int(concept_id)] = count / num_people
     
     return count_dict, prev_dict
 
-def get_prevalence_rank():
-    None
+def get_prevalence_rank(prevalence_dict, concept_dict, top_n, domain):
 
-def build_concept_dict(concepts):
+    if domain == "condition":
+        target_concept_dict = concept_dict["condition_dict"]
+    elif domain == "drug":
+        target_concept_dict = concept_dict["drug_dict"]
+    elif domain == "drug_ingredient":
+        target_concept_dict = concept_dict["drug_ingredient_dict"]
+    elif domain == "procedure":
+        target_concept_dict = concept_dict["procedure_dict"]
+
+    concepts = list(set.intersection(set(target_concept_dict.keys()), set(prevalence_dict.keys())))
+    prevalences = []
+
+    for concept in concepts:
+        prevalences.append(prevalence_dict[concept])
+
+    sorted_idx = np.array(prevalences).argsort()
+    sorted_n_concepts = concepts[sorted_idx][-(top_n):]
+    sorted_n_prevalences = prevalences[sorted_idx][-(top_n):]
+
+    for i in range(top_n):
+        print("Rank {order} : {concept_name}, {prevalence}".format(order=(i+1), 
+        concept_name=concept_dict[str(sorted_n_concepts[-(i+1)])],
+        prevalence=sorted_n_prevalences[-(i+1)]))
+
+def build_concept_dict(concepts, database="ssms"):
 
     fh, reader = _open_csv_reader(concepts, database)
     
@@ -47,15 +70,15 @@ def build_concept_dict(concepts):
     for row in reader:
         if len(row) == table_width:
             concept_id, concept_name, domain_id = [row[i] for i in columns]
-            total_dict[concept_id] = [concept_name, domain_id]
+            total_dict[int(concept_id)] = [concept_name, domain_id]
 
             if domain_id == "Condition":
-                condition_dict[concept_id] = [concept_name, domain_id]
+                condition_dict[int(concept_id)] = [concept_name, domain_id]
             if domain_id == "Drug":
                 concept_id, concept_name, domain_id, vocabulary_id, concept_class_id = [row[i] for i in columns_drug]
-                drug_dict[concept_id] = [concept_name, domain_id, vocabulary_id, concept_class_id]
+                drug_dict[int(concept_id)] = [concept_name, domain_id, vocabulary_id, concept_class_id]
                 if concept_class_id == "Ingredient":
-                    drug_ingredient_dict[concept_id] = [concept_name, domain_id, vocabulary_id, concept_class_id]
+                    drug_ingredient_dict[int(concept_id)] = [concept_name, domain_id, vocabulary_id, concept_class_id]
     
     concept_dict["condition_dict"] = condition_dict
     concept_dict["drug_dict"] = drug_dict
@@ -65,16 +88,109 @@ def build_concept_dict(concepts):
     return concept_dict
 
 def build_ratio_dict(covid_prevalence_dict, baseline_prevalence_dict, concept_dict):
-    None
+    prevalence_ratio_dict = dict()
+    
+    covid_concepts = set(covid_prevalence_dict.keys())
+    baseline_concepts = set(baseline_prevalence_dict.keys())
+    intersection_concepts = set.intersection(covid_concepts, baseline_concepts)
 
-def get_ratio_rank():
-    None
+    condition_intersection_concepts = set.intersection(set(concept_dict["condition_dict"].keys()), intersection_concepts)
+    drug_intersection_concepts = set.intersection(set(concept_dict["drug_dict"].keys()), intersection_concepts)
+    drug_ingredient_intersection_concepts = set.intersection(set(concept_dict["drug_ingredient_dict"].keys()), intersection_concepts)
+    procedure_intersection_concepts = set.intersection(set(concept_dict["procedure_dict"].keys()), intersection_concepts)
 
-def build_pair_dict(concept_pair, denominator):
-    None
+    condition_ratio_dict = dict()
+    drug_ratio_dict = dict()
+    drug_ingredient_ratio_dict = dict()
+    procedure_ratio_dict = dict()
 
-def get_pair_rank():
-    None
+    print("build prevalence ratio dictionary for condition concepts...")
+    for concept in list(condition_intersection_concepts):
+        condition_ratio_dict[int(concept)] = np.log(covid_freqdict[concept] / (baseline_freqdict[concept]))
+
+    print("build prevalence ratio dictionary for drug concepts...")
+    for concept in list(drug_intersection_concepts):
+        drug_ratio_dict[int(concept)] = np.log(covid_freqdict[concept] / (baseline_freqdict[concept]))
+
+    print("build prevalence ratio dictionary for drug ingredient concepts...")
+    for concept in list(drug_ingredient_intersection_concepts):
+        drug_ingredient_ratio_dict[int(concept)] = np.log(covid_freqdict[concept] / (baseline_freqdict[concept]))
+
+    print("build prevalence ratio dictionary for procedure concepts...")
+    for concept in list(procedure_intersection_concepts):
+        procedure_ratio_dict[int(concept)] = np.log(covid_freqdict[concept] / (baseline_freqdict[concept]))
+
+    prevalence_ratio_dict["condition_ratio_dict"] = condition_ratio_dict
+    prevalence_ratio_dict["drug_ratio_dict"] = drug_ratio_dict
+    prevalence_ratio_dict["drug_ingredient_ratio_dict"] = drug_ingredient_ratio_dict
+    prevalence_ratio_dict["procedure_ratio_dict"] = procedure_ratio_dict
+
+    return prevalence_ratio_dict
+
+def get_ratio_rank(prevalence_ratio_dict, top_n, domain):
+    """Get the top-n highest concepts from the ratio dictionary for a specific domain"""
+
+    if domain == "condition":
+        target_dict = prevalence_ratio_dict["condition_ratio_dict"]
+    elif domain == "drug":
+        target_dict = prevalence_ratio_dict["drug_ratio_dict"]
+    elif domain == "drug_ingredient":
+        target_dict = prevalence_ratio_dict["drug_ingredient_ratio_dict"]
+    elif domain == "procedure":
+        target_dict = prevalence_ratio_dict["procedure_ratio_dict"]
+
+    concepts = list(target_dict.keys())
+    ratios = []
+
+    for concept in concetps:
+        ratios.append(target_dict[concept])
+
+    sorted_idx = np.array(ratios).argsort()
+    sorted_n_concepts = concepts[sorted_idx][-(top_n):]
+    sorted_n_ratios = ratios[sorted_idx][-(top_n):]
+
+    for i in range(top_n):
+        print("Rank {order} : {concept_name}, {prevalence}".format(order=(i+1), 
+        concept_name=concept_dict[str(sorted_n_concepts[-(i+1)])],
+        prevalence=sorted_n_ratios[-(i+1)]))
+
+def build_pair_prevalence_dict(concept_pair, denominator, database="ssms"):
+
+    fh, reader = _open_csv_reader(concept_pair, database)
+
+    header = next(reader)
+    table_width = len(header)
+    columns = _find_columns(header, ["concept_id1", "concept_id2", "count"])
+
+    pair_prevalence_dict = defaultdict(dict)
+    
+    for row in reader:
+        if len(row) == table_width:
+            concept_id1, concept_id2, count = [row[i] for i in columns]
+            pair_prevalence_dict[int(concept_id1)][int(concept_id2)] = int(count) / denominator
+            pair_prevalence_dict[int(concept_id2)][int(concept_id1)] = int(count) / denominator
+
+    return pair_prevalence_dict
+
+def get_pair_rank(pair_prevalence_dict, concept_dict, candidate_concept):
+
+    paired_concepts = list(pair_prevalence_dict[candidate_concept].keys())
+
+    concepts = []
+    prevalences = []
+
+    for concept in paired_concepts:
+        concepts.append(concept)
+        prevalences.append(pair_prevalence_dict[candidate_concept][concept])
+
+    sorted_idx = np.array(prevalences).argsort()
+    sorted_concepts = concepts[sorted_idx]
+    sorted_prevalences = prevalences[sorted_idx]
+
+    for i in range(len(sorted_concepts)):
+        print("Rank {order} : {concept_name}, {prevalence}".format(order=(i+1), 
+        concept_name=concept_dict[str(sorted_concepts[-(i+1)])],
+        prevalence=sorted_prevalences[-(i+1)]))
 
 def _open_csv_reader(file, database):
     """Opens a CSV reader compatible with the specified database
