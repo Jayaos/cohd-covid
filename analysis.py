@@ -80,12 +80,12 @@ def build_concept_dict(concepts, database="ssms"):
                 if concept_class_id == "Ingredient":
                     drug_ingredient_dict[int(concept_id)] = [concept_name, domain_id, vocabulary_id, concept_class_id]
     
-    concept_dict["condition_dict"] = condition_dict
-    concept_dict["drug_dict"] = drug_dict
-    concept_dict["drug_ingredient_dict"] = drug_ingredient_dict
-    concept_dict["total_dict"] = total_dict
+    concept_definition_dict["condition_dict"] = condition_dict
+    concept_definition_dict["drug_dict"] = drug_dict
+    concept_definition_dict["drug_ingredient_dict"] = drug_ingredient_dict
+    concept_definition_dict["total_dict"] = total_dict
 
-    return concept_dict
+    return concept_definition_dict
 
 def build_ratio_dict(covid_prevalence_dict, baseline_prevalence_dict, concept_dict):
     prevalence_ratio_dict = dict()
