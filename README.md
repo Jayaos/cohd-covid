@@ -8,7 +8,12 @@ This repository has source codes for reproducing methods and analyses in the fol
 
 ### To Export Raw Data from OMOP Database
 
-### To Calculate Concept Prevalence, Co-occurrence, and Symptom Prevalence
+To export raw patient data from OMOP database, execute the query of the cohort you wanted to export in /sql_queries directory. Concept definitions can be exported by executing export_concepts.sql in the /sql_queries/settings directory.
 
-### Analyses using Concept Prevalence, Co-occurrence, and Symptom Prevalence
+### To Calculate Concept Count, Concept Co-occurrence, and Symptom Prevalence
 
+analysis.py contain functions to calculate the concept count, concept co-occurrence, and symptom prevalence based on the raw data exported from the database. prevalence_example.ipynb contain examples to use the functions in the package.
+
+### Analyses using Concept Count, Concept Co-occurrence, and Symptom Prevalence
+
+analysis.py contain functions to perform various analyses based on the concept count, concept co-occurrence, and symptom prevalence results. analysis_example.ipynb contain examples to use the functions and to perfrom analyses in the paper.
