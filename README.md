@@ -6,9 +6,18 @@ This repository has source codes for reproducing methods and analyses in the fol
         Junghwan Lee, Jae Hyun Kim, Cong Liu, Daichi Shimbo, Marwah Abdalla, Casey Ta, Chunhua Weng
         Preprint
 
-### To Export Raw Data from OMOP Database
+### To Export Raw Data from OMOP Database via SQL Server Management Studio (SSML)
 
-To export raw patient data from OMOP database, execute the query of the cohort you wanted to export in /sql_queries directory. Concept definitions can be exported by executing export_concepts.sql in the /sql_queries/settings directory.
+To export raw patient data from OMOP database, adjust SSML settings first. 
+
+1. Update settings in SQL Server Manangement Studio so that Results to Text saves tab-delimited files
+Tools > Options > Query Results > SQL Server > Results to Text
+-Output format: tab delimited
+-Include column headers in the result set: enabled
+Then restart SSMS for new settings to take effect
+2. Enable SQLCMD mode at Query > SQLCMD Mode
+
+Then execute the query of the cohort you wanted to export in /sql_queries directory. Concept definitions can be exported by executing export_concepts.sql in the /sql_queries/settings directory.
 
 ### To Calculate Concept Count, Concept Co-occurrence, and Symptom Prevalence
 
