@@ -56,7 +56,13 @@ def logging_setup(output_dir):
 
 def _find_columns(header, column_names):
     """Finds the index of the column names in the header"""
-    return [[i for i in range(len(header)) if header[i] == column_name][0] for column_name in column_names]
+    columns = []
+
+    for i, head_col in enumerate(header):
+        if head_col in column_names:
+            columns.append(i)
+            
+    return columns
 
 def _utf_8_encoder(unicode_csv_data):
     """Encodes Unicode source as UTF-8"""
