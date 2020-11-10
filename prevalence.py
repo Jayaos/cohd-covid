@@ -1159,6 +1159,3 @@ def write_symptom_definitions(output_dir, symptom_dict):
 
         for concept in symptom_concepts:
             writer.writerow([symptom, concept, symptom_info[concept][0], symptom_info[concept][1]])
-
-
-
