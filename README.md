@@ -3,7 +3,7 @@
 This repository has source codes for reproducing methods and analyses in the following [paper](https://scholar.google.com/citations?user=iSx6QrwAAAAJ&hl=en&oi=ao):
 
     COHD-COVID: Columbia Open Health Data for COVID-19 Research
-        Junghwan Lee, Jae Hyun Kim, Cong Liu, Daichi Shimbo, Marwah Abdalla, Casey Ta, Chunhua Weng
+        Junghwan Lee, Jae Hyun Kim, Cong Liu, George Hripcsak, Casey Ta, Chunhua Weng
         Preprint
 
 ### To Export Raw Data from OMOP Database via SQL Server Management Studio (SSML)
