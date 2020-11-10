@@ -502,13 +502,14 @@ def single_concept_ranged_counts(output_dir, cp_ranged, randomize=True, min_coun
     # Open csv_writer and write header
     output_file = os.path.join(output_dir, filename)
     fh, writer = _open_csv_writer(output_file)
-    writer.writerow(['concept_id', 'count'])
+    writer.writerow(['concept_id', 'count', 'prevalence'])
 
     # Keep track of concepts exported
     concepts_exported = list()
         
     # Write count of each concept
     concept_patient = cp_ranged.concept_patient
+    total_npts = cp_ranged[2]
     for concept_id in sorted(concept_patient.keys()):
         # Get the count of unique patients
         pts = concept_patient[concept_id]
@@ -523,7 +524,7 @@ def single_concept_ranged_counts(output_dir, cp_ranged, randomize=True, min_coun
             npts = np.random.poisson(npts)
 
         # Write concept ID and count to file
-        writer.writerow([concept_id, npts])
+        writer.writerow([concept_id, npts, npts / total_npts])
 
         # Keep track of exported concepts
         concepts_exported.append(concept_id)
@@ -591,6 +592,7 @@ def paired_concept_ranged_counts(output_dir, cp_ranged, randomize=True, min_coun
     concept_pairs_exported = list()
 
     # Write out each concept's count
+    total_npts = cp_ranged[2]
     for counter, concept_id_1 in enumerate(concept_ids):
         # Progress message
         if counter % progress_interval == 0:
@@ -614,7 +616,7 @@ def paired_concept_ranged_counts(output_dir, cp_ranged, randomize=True, min_coun
                 npts = np.random.poisson(npts)
 
             # Write concept_id_1, concept_id_2, and co-occurrence count to file
-            writer.writerow([concept_id_1, concept_id_2, npts])
+            writer.writerow([concept_id_1, concept_id_2, npts, npts / total_npts])
 
             # Keep track of concept-pairs
             concept_pairs_exported.append((concept_id_1, concept_id_2))
@@ -1119,3 +1121,44 @@ def paired_concept_yearly_deviation(output_dir, cp_data, concept_pairs, year_ran
         writer.writerow([concept_id_1, concept_id_2, m, s])
 
     fh.close()
+
+def write_concept_definitions(output_dir, concepts):
+    logging.info("Writing concept definitions...")
+
+    # Open csv_writer and write header
+    output_file = os.path.join(output_dir, "concepts.txt")
+    fh, writer = _open_csv_writer(output_file)
+    writer.writerow(['concept_id', 'concept_name', 'domain_id', 'vocabulary_id', 'class_id'])
+
+    total_concepts = list(concepts.keys())
+
+    progress = 0
+    for counter, concept_id in enumerate(total_concepts):
+
+        if counter % np.ceil(len(total_concepts) / 100) == 0:
+            progress = progress + 1
+            print("{} percent done".format(progress))
+
+        concept_info = concepts[concept_id]
+        writer.writerow([concept_id, concept_info["concept_name"], concept_info["domain_id"], 
+        concept_info["vocabulary_id"], concept_info["concept_class_id"]])
+
+def write_symptom_definitions(output_dir, symptom_dict):
+    logging.info("Writing symptom definitions...")
+
+    # Open csv_writer and write header
+    output_file = os.path.join(output_dir, "symptoms.txt")
+    fh, writer = _open_csv_writer(output_file)
+    writer.writerow(['symptom', 'concept_id', 'concept_name', 'domain_id'])
+
+    total_symptoms = list(symptom_dict.keys())
+
+    for _, symptom in enumerate(total_symptoms):
+        symptom_concepts = list(symptom_dict[symptom].keys())
+        symptom_info = symptom_dict[symptom]
+
+        for concept in symptom_concepts:
+            writer.writerow([symptom, concept, symptom_info[concept][0], symptom_info[concept][1]])
+
+
+
