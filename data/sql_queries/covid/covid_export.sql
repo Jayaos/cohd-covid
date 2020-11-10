@@ -1015,7 +1015,7 @@ WHERE condition_concept_id != 0
 	AND c.domain_id = 'Condition'	-- Make sure we only get conditions from the condition_occurrence table
 	AND i.concept_id IS NULL		-- Make sure condition is not an iatrogenic code
 	AND person_id in (SELECT person_id FROM #final_cohort)
-	AND condition_start_date > '2020-03-01'
+	AND condition_start_date > '2020-03-01' AND condition_start_date < '2020-09-01'
   AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)
 UNION ALL
 SELECT DISTINCT de.person_id, de.drug_exposure_start_date AS date, de.drug_concept_id AS concept_id, de.visit_occurrence_id
@@ -1026,7 +1026,7 @@ WHERE drug_concept_id != 0
 	AND c.domain_id = 'Drug'	-- Make sure we only get conditions from the condition_occurrence table
 	AND i.concept_id IS NULL	-- Make sure condition is not an iatrogenic code
 	AND person_id in (SELECT person_id FROM #final_cohort)
-	AND drug_exposure_start_date > '2020-03-01'
+	AND drug_exposure_start_date > '2020-03-01' AND drug_exposure_start_date < '2020-09-01'
   AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)
 UNION ALL
 SELECT DISTINCT po.person_id, po.procedure_date AS date, po.procedure_concept_id AS concept_id, po.visit_occurrence_id
@@ -1037,7 +1037,7 @@ WHERE procedure_concept_id != 0
 	AND c.domain_id = 'Procedure'	-- Make sure we only get conditions from the condition_occurrence table
 	AND i.concept_id IS NULL		-- Make sure condition is not an iatrogenic code;
   AND person_id in (SELECT person_id FROM #final_cohort)
-  AND procedure_date > '2020-03-01'
+  AND procedure_date > '2020-03-01' AND procedure_date < '2020-09-01'
   AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)) as tmp
 ;
 
@@ -1067,51 +1067,23 @@ FROM #final_data
 WHERE gender_concept_id = 8507
 
 -- Export person ID, start date, and concept IDs for conditions, drugs, and procedures
-:OUT D:\cohd\covid_narrow_noobs.txt
+:OUT C:\Users\Jay\Desktop\cohd_covid\covid_male_q2r2.txt
 SELECT person_id, date, concept_id, visit_occurrence_id
 FROM #final_data
+WHERE person_id in (SELECT * FROM #male_cohort) --change cohort here
 
-TRUNCATE TABLE #strategy_ends;
 DROP TABLE #strategy_ends;
-
-TRUNCATE TABLE #cohort_rows;
 DROP TABLE #cohort_rows;
-
-TRUNCATE TABLE #final_cohort;
 DROP TABLE #final_cohort;
-
-TRUNCATE TABLE #inclusion_events;
 DROP TABLE #inclusion_events;
-
-TRUNCATE TABLE #qualified_events;
 DROP TABLE #qualified_events;
-
-TRUNCATE TABLE #included_events;
 DROP TABLE #included_events;
-
-TRUNCATE TABLE #Codesets;
 DROP TABLE #Codesets;
-
-TRUNCATE TABLE #iatrogenic_codes;
 DROP TABLE #iatrogenic_codes;
-
-TRUNCATE TABLE #iatrogenic_codes_with_desc;
 DROP TABLE #iatrogenic_codes_with_desc;
-
-TRUNCATE TABLE #final_data;
 DROP TABLE #final_data;
-
-TRUNCATE TABLE #concept_table;
 DROP TABLE #concept_table;
-
-TRUNCATE TABLE #female_cohort;
 DROP TABLE #female_cohort;
-
-TRUNCATE TABLE #male_cohort;
 DROP TABLE #male_cohort;
-
-TRUNCATE TABLE #adult_cohort;
 DROP TABLE #adult_cohort;
-
-TRUNCATE TABLE #senior_cohort;
 DROP TABLE #senior_cohort;

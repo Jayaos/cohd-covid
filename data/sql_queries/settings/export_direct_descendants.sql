@@ -1,7 +1,3 @@
-----------
--- export covid cohort, narrow, no previous observation required
-----------
-
 -- Prevent the count from showing up in the text file results
 SET NOCOUNT ON;
 SET ANSI_WARNINGS OFF;
@@ -230,889 +226,190 @@ FROM
 	JOIN concept_ancestor ca ON ca.ancestor_concept_id = i.concept_id) x
 ;
 
-CREATE TABLE #Codesets (
-  codeset_id int NOT NULL,
-  concept_id bigint NOT NULL
-)
-;
-
-INSERT INTO #Codesets (codeset_id, concept_id)
-SELECT 0 as codeset_id, c.concept_id FROM (select distinct I.concept_id FROM
-( 
-  select concept_id from dbo.CONCEPT where concept_id in (37311061)
-UNION  select c.concept_id
-  from dbo.CONCEPT c
-  join dbo.CONCEPT_ANCESTOR ca on c.concept_id = ca.descendant_concept_id
-  and ca.ancestor_concept_id in (37311061)
-  and c.invalid_reason is null
-
-) I
-) C;
-INSERT INTO #Codesets (codeset_id, concept_id)
-SELECT 1 as codeset_id, c.concept_id FROM (select distinct I.concept_id FROM
-( 
-  select concept_id from dbo.CONCEPT where concept_id in (37310282)
-UNION  select c.concept_id
-  from dbo.CONCEPT c
-  join dbo.CONCEPT_ANCESTOR ca on c.concept_id = ca.descendant_concept_id
-  and ca.ancestor_concept_id in (37310282)
-  and c.invalid_reason is null
-
-) I
-) C;
-INSERT INTO #Codesets (codeset_id, concept_id)
-SELECT 2 as codeset_id, c.concept_id FROM (select distinct I.concept_id FROM
-( 
-  select concept_id from dbo.CONCEPT where concept_id in (756055)
-UNION  select c.concept_id
-  from dbo.CONCEPT c
-  join dbo.CONCEPT_ANCESTOR ca on c.concept_id = ca.descendant_concept_id
-  and ca.ancestor_concept_id in (756055)
-  and c.invalid_reason is null
-
-) I
-LEFT JOIN
-(
-  select concept_id from dbo.CONCEPT where concept_id in (37310282,37310281)
-UNION  select c.concept_id
-  from dbo.CONCEPT c
-  join dbo.CONCEPT_ANCESTOR ca on c.concept_id = ca.descendant_concept_id
-  and ca.ancestor_concept_id in (37310282,37310281)
-  and c.invalid_reason is null
-
-) E ON I.concept_id = E.concept_id
-WHERE E.concept_id is null
-) C;
-INSERT INTO #Codesets (codeset_id, concept_id)
-SELECT 3 as codeset_id, c.concept_id FROM (select distinct I.concept_id FROM
-( 
-  select concept_id from dbo.CONCEPT where concept_id in (710158,710155,710156,710159,710160,45756093,42501115,586414,45600471,586415)
-
-) I
-LEFT JOIN
-(
-  select concept_id from dbo.CONCEPT where concept_id in (45542411,710157)
-
-) E ON I.concept_id = E.concept_id
-WHERE E.concept_id is null
-) C;
-INSERT INTO #Codesets (codeset_id, concept_id)
-SELECT 4 as codeset_id, c.concept_id FROM (select distinct I.concept_id FROM
-( 
-  select concept_id from dbo.CONCEPT where concept_id in (262,9201)
-UNION  select c.concept_id
-  from dbo.CONCEPT c
-  join dbo.CONCEPT_ANCESTOR ca on c.concept_id = ca.descendant_concept_id
-  and ca.ancestor_concept_id in (262,9201)
-  and c.invalid_reason is null
-
-) I
-) C;
-
-
-with primary_events (event_id, person_id, start_date, end_date, op_start_date, op_end_date, visit_occurrence_id) as
-(
--- Begin Primary Events
-select P.ordinal as event_id, P.person_id, P.start_date, P.end_date, op_start_date, op_end_date, cast(P.visit_occurrence_id as bigint) as visit_occurrence_id
-FROM
-(
-  select E.person_id, E.start_date, E.end_date,
-         row_number() OVER (PARTITION BY E.person_id ORDER BY E.sort_date ASC) ordinal,
-         OP.observation_period_start_date as op_start_date, OP.observation_period_end_date as op_end_date, cast(E.visit_occurrence_id as bigint) as visit_occurrence_id
-  FROM 
-  (
-  -- Begin Visit Occurrence Criteria
-select C.person_id, C.visit_occurrence_id as event_id, C.visit_start_date as start_date, C.visit_end_date as end_date,
-       C.visit_concept_id as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.visit_start_date as sort_date
-from 
-(
-  select vo.* 
-  FROM dbo.VISIT_OCCURRENCE vo
-JOIN #Codesets codesets on ((vo.visit_concept_id = codesets.concept_id and codesets.codeset_id = 4))
-) C
-
-WHERE C.visit_start_date > DATEFROMPARTS(2020, 03, 01)
--- End Visit Occurrence Criteria
-
-  ) E
-	JOIN dbo.observation_period OP on E.person_id = OP.person_id and E.start_date >=  OP.observation_period_start_date and E.start_date <= op.observation_period_end_date
-  WHERE DATEADD(day,0,OP.OBSERVATION_PERIOD_START_DATE) <= E.START_DATE AND DATEADD(day,0,E.START_DATE) <= OP.OBSERVATION_PERIOD_END_DATE
-) P
-
--- End Primary Events
-
-)
-SELECT event_id, person_id, start_date, end_date, op_start_date, op_end_date, visit_occurrence_id
-INTO #qualified_events
-FROM 
-(
-  select pe.event_id, pe.person_id, pe.start_date, pe.end_date, pe.op_start_date, pe.op_end_date, row_number() over (partition by pe.person_id order by pe.start_date ASC) as ordinal, cast(pe.visit_occurrence_id as bigint) as visit_occurrence_id
-  FROM primary_events pe
-  
-JOIN (
--- Begin Criteria Group
-select 0 as index_id, person_id, event_id
-FROM
-(
-  select E.person_id, E.event_id 
-  FROM primary_events E
-  INNER JOIN
-  (
-    -- Begin Correlated Criteria
-SELECT 0 as index_id, p.person_id, p.event_id
-FROM primary_events P
-INNER JOIN
-(
-  -- Begin Condition Occurrence Criteria
-SELECT C.person_id, C.condition_occurrence_id as event_id, C.condition_start_date as start_date, COALESCE(C.condition_end_date, DATEADD(day,1,C.condition_start_date)) as end_date,
-       C.CONDITION_CONCEPT_ID as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.condition_start_date as sort_date
-FROM 
-(
-  SELECT co.* 
-  FROM dbo.CONDITION_OCCURRENCE co
-  JOIN #Codesets codesets on ((co.condition_concept_id = codesets.concept_id and codesets.codeset_id = 0))
-) C
-
-
--- End Condition Occurrence Criteria
-
-) A on A.person_id = P.person_id  AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= DATEADD(day,-21,P.START_DATE) AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= DATEADD(day,0,P.END_DATE)
-GROUP BY p.person_id, p.event_id
-HAVING COUNT(A.TARGET_CONCEPT_ID) >= 1
--- End Correlated Criteria
-
-UNION ALL
--- Begin Correlated Criteria
-SELECT 1 as index_id, p.person_id, p.event_id
-FROM primary_events P
-INNER JOIN
-(
-  -- Begin Condition Occurrence Criteria
-SELECT C.person_id, C.condition_occurrence_id as event_id, C.condition_start_date as start_date, COALESCE(C.condition_end_date, DATEADD(day,1,C.condition_start_date)) as end_date,
-       C.CONDITION_CONCEPT_ID as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.condition_start_date as sort_date
-FROM 
-(
-  SELECT co.* 
-  FROM dbo.CONDITION_OCCURRENCE co
-  JOIN #Codesets codesets on ((co.condition_source_concept_id = codesets.concept_id and codesets.codeset_id = 3))
-) C
-
-
--- End Condition Occurrence Criteria
-
-) A on A.person_id = P.person_id  AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= DATEADD(day,-21,P.START_DATE) AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= DATEADD(day,0,P.END_DATE)
-GROUP BY p.person_id, p.event_id
-HAVING COUNT(A.TARGET_CONCEPT_ID) >= 1
--- End Correlated Criteria
-
-UNION ALL
--- Begin Correlated Criteria
-SELECT 2 as index_id, p.person_id, p.event_id
-FROM primary_events P
-INNER JOIN
-(
-  -- Begin Measurement Criteria
-select C.person_id, C.measurement_id as event_id, C.measurement_date as start_date, DATEADD(d,1,C.measurement_date) as END_DATE,
-       C.measurement_concept_id as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.measurement_date as sort_date
-from 
-(
-  select m.* 
-  FROM dbo.MEASUREMENT m
-JOIN #Codesets codesets on ((m.measurement_concept_id = codesets.concept_id and codesets.codeset_id = 1))
-) C
-
-
--- End Measurement Criteria
-
-) A on A.person_id = P.person_id  AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= DATEADD(day,-21,P.START_DATE) AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= DATEADD(day,0,P.END_DATE)
-GROUP BY p.person_id, p.event_id
-HAVING COUNT(A.TARGET_CONCEPT_ID) >= 1
--- End Correlated Criteria
-
-UNION ALL
--- Begin Correlated Criteria
-SELECT 3 as index_id, p.person_id, p.event_id
-FROM primary_events P
-INNER JOIN
-(
-  -- Begin Measurement Criteria
-select C.person_id, C.measurement_id as event_id, C.measurement_date as start_date, DATEADD(d,1,C.measurement_date) as END_DATE,
-       C.measurement_concept_id as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.measurement_date as sort_date
-from 
-(
-  select m.* 
-  FROM dbo.MEASUREMENT m
-JOIN #Codesets codesets on ((m.measurement_concept_id = codesets.concept_id and codesets.codeset_id = 2))
-) C
-
-WHERE C.value_as_concept_id in (4126681,45877985,9191,4181412,45879438,45884084)
--- End Measurement Criteria
-
-) A on A.person_id = P.person_id  AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= DATEADD(day,-21,P.START_DATE) AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= DATEADD(day,0,P.END_DATE)
-GROUP BY p.person_id, p.event_id
-HAVING COUNT(A.TARGET_CONCEPT_ID) >= 1
--- End Correlated Criteria
-
-UNION ALL
--- Begin Correlated Criteria
-SELECT 4 as index_id, p.person_id, p.event_id
-FROM primary_events P
-INNER JOIN
-(
-  -- Begin Observation Criteria
-select C.person_id, C.observation_id as event_id, C.observation_date as start_date, DATEADD(d,1,C.observation_date) as END_DATE,
-       C.observation_concept_id as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.observation_date as sort_date
-from 
-(
-  select o.* 
-  FROM dbo.OBSERVATION o
-JOIN #Codesets codesets on ((o.observation_concept_id = codesets.concept_id and codesets.codeset_id = 2))
-) C
-
-WHERE C.value_as_concept_id in (4126681,45877985,9191,45884084,4181412,45879438)
--- End Observation Criteria
-
-) A on A.person_id = P.person_id  AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= DATEADD(day,-21,P.START_DATE) AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= DATEADD(day,0,P.END_DATE)
-GROUP BY p.person_id, p.event_id
-HAVING COUNT(A.TARGET_CONCEPT_ID) >= 1
--- End Correlated Criteria
-
-UNION ALL
--- Begin Correlated Criteria
-SELECT 5 as index_id, p.person_id, p.event_id
-FROM primary_events P
-INNER JOIN
-(
-  -- Begin Observation Criteria
-select C.person_id, C.observation_id as event_id, C.observation_date as start_date, DATEADD(d,1,C.observation_date) as END_DATE,
-       C.observation_concept_id as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.observation_date as sort_date
-from 
-(
-  select o.* 
-  FROM dbo.OBSERVATION o
-JOIN #Codesets codesets on ((o.observation_source_concept_id = codesets.concept_id and codesets.codeset_id = 3))
-) C
-
-
--- End Observation Criteria
-
-) A on A.person_id = P.person_id  AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= DATEADD(day,-21,P.START_DATE) AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= DATEADD(day,0,P.END_DATE)
-GROUP BY p.person_id, p.event_id
-HAVING COUNT(A.TARGET_CONCEPT_ID) >= 1
--- End Correlated Criteria
-
-  ) CQ on E.person_id = CQ.person_id and E.event_id = CQ.event_id
-  GROUP BY E.person_id, E.event_id
-  HAVING COUNT(index_id) > 0
-) G
--- End Criteria Group
-) AC on AC.person_id = pe.person_id and AC.event_id = pe.event_id
-
-) QE
-
-;
-
---- Inclusion Rule Inserts
-
-select 0 as inclusion_rule_id, person_id, event_id
-INTO #Inclusion_0
-FROM 
-(
-  select pe.person_id, pe.event_id
-  FROM #qualified_events pe
-  
-JOIN (
--- Begin Criteria Group
-select 0 as index_id, person_id, event_id
-FROM
-(
-  select E.person_id, E.event_id 
-  FROM #qualified_events E
-  INNER JOIN
-  (
- 
--- Begin Demographic Criteria
-SELECT 0 as index_id, e.person_id, e.event_id
-FROM #qualified_events E
-JOIN dbo.PERSON P ON P.PERSON_ID = E.PERSON_ID
-WHERE YEAR(E.start_date) - P.year_of_birth >= 18 AND (P.gender_concept_id = 8507 OR P.gender_concept_id = 8532)
-GROUP BY e.person_id, e.event_id
--- End Demographic Criteria
-
-  ) CQ on E.person_id = CQ.person_id and E.event_id = CQ.event_id
-  GROUP BY E.person_id, E.event_id
-  HAVING COUNT(index_id) = 1
-) G
--- End Criteria Group
-) AC on AC.person_id = pe.person_id AND AC.event_id = pe.event_id
-) Results
-;
-
-select 1 as inclusion_rule_id, person_id, event_id
-INTO #Inclusion_1
-FROM 
-(
-  select pe.person_id, pe.event_id
-  FROM #qualified_events pe
-  
-JOIN (
--- Begin Criteria Group
-select 0 as index_id, person_id, event_id
-FROM
-(
-  select E.person_id, E.event_id 
-  FROM #qualified_events E
-  INNER JOIN
-  (
-    -- Begin Correlated Criteria
-SELECT 0 as index_id, p.person_id, p.event_id
-FROM #qualified_events P
-LEFT JOIN
-(
-  select PE.person_id, PE.event_id, PE.start_date, PE.end_date, PE.target_concept_id, PE.visit_occurrence_id, PE.sort_date FROM (
--- Begin Visit Occurrence Criteria
-select C.person_id, C.visit_occurrence_id as event_id, C.visit_start_date as start_date, C.visit_end_date as end_date,
-       C.visit_concept_id as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.visit_start_date as sort_date
-from 
-(
-  select vo.* 
-  FROM dbo.VISIT_OCCURRENCE vo
-JOIN #Codesets codesets on ((vo.visit_concept_id = codesets.concept_id and codesets.codeset_id = 4))
-) C
-
-
--- End Visit Occurrence Criteria
-
-) PE
-JOIN (
--- Begin Criteria Group
-select 0 as index_id, person_id, event_id
-FROM
-(
-  select E.person_id, E.event_id 
-  FROM (SELECT Q.person_id, Q.event_id, Q.start_date, Q.end_date, Q.visit_occurrence_id, OP.observation_period_start_date as op_start_date, OP.observation_period_end_date as op_end_date
-FROM (-- Begin Visit Occurrence Criteria
-select C.person_id, C.visit_occurrence_id as event_id, C.visit_start_date as start_date, C.visit_end_date as end_date,
-       C.visit_concept_id as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.visit_start_date as sort_date
-from 
-(
-  select vo.* 
-  FROM dbo.VISIT_OCCURRENCE vo
-JOIN #Codesets codesets on ((vo.visit_concept_id = codesets.concept_id and codesets.codeset_id = 4))
-) C
-
-
--- End Visit Occurrence Criteria
-) Q
-JOIN dbo.OBSERVATION_PERIOD OP on Q.person_id = OP.person_id 
-  and OP.observation_period_start_date <= Q.start_date and OP.observation_period_end_date >= Q.start_date
-) E
-  INNER JOIN
-  (
-    -- Begin Correlated Criteria
-SELECT 0 as index_id, p.person_id, p.event_id
-FROM (SELECT Q.person_id, Q.event_id, Q.start_date, Q.end_date, Q.visit_occurrence_id, OP.observation_period_start_date as op_start_date, OP.observation_period_end_date as op_end_date
-FROM (-- Begin Visit Occurrence Criteria
-select C.person_id, C.visit_occurrence_id as event_id, C.visit_start_date as start_date, C.visit_end_date as end_date,
-       C.visit_concept_id as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.visit_start_date as sort_date
-from 
-(
-  select vo.* 
-  FROM dbo.VISIT_OCCURRENCE vo
-JOIN #Codesets codesets on ((vo.visit_concept_id = codesets.concept_id and codesets.codeset_id = 4))
-) C
-
-
--- End Visit Occurrence Criteria
-) Q
-JOIN dbo.OBSERVATION_PERIOD OP on Q.person_id = OP.person_id 
-  and OP.observation_period_start_date <= Q.start_date and OP.observation_period_end_date >= Q.start_date
-) P
-INNER JOIN
-(
-  -- Begin Condition Occurrence Criteria
-SELECT C.person_id, C.condition_occurrence_id as event_id, C.condition_start_date as start_date, COALESCE(C.condition_end_date, DATEADD(day,1,C.condition_start_date)) as end_date,
-       C.CONDITION_CONCEPT_ID as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.condition_start_date as sort_date
-FROM 
-(
-  SELECT co.* 
-  FROM dbo.CONDITION_OCCURRENCE co
-  JOIN #Codesets codesets on ((co.condition_concept_id = codesets.concept_id and codesets.codeset_id = 0))
-) C
-
-
--- End Condition Occurrence Criteria
-
-) A on A.person_id = P.person_id  AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= DATEADD(day,-21,P.START_DATE) AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= DATEADD(day,0,P.END_DATE)
-GROUP BY p.person_id, p.event_id
-HAVING COUNT(A.TARGET_CONCEPT_ID) >= 1
--- End Correlated Criteria
-
-UNION ALL
--- Begin Correlated Criteria
-SELECT 1 as index_id, p.person_id, p.event_id
-FROM (SELECT Q.person_id, Q.event_id, Q.start_date, Q.end_date, Q.visit_occurrence_id, OP.observation_period_start_date as op_start_date, OP.observation_period_end_date as op_end_date
-FROM (-- Begin Visit Occurrence Criteria
-select C.person_id, C.visit_occurrence_id as event_id, C.visit_start_date as start_date, C.visit_end_date as end_date,
-       C.visit_concept_id as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.visit_start_date as sort_date
-from 
-(
-  select vo.* 
-  FROM dbo.VISIT_OCCURRENCE vo
-JOIN #Codesets codesets on ((vo.visit_concept_id = codesets.concept_id and codesets.codeset_id = 4))
-) C
-
-
--- End Visit Occurrence Criteria
-) Q
-JOIN dbo.OBSERVATION_PERIOD OP on Q.person_id = OP.person_id 
-  and OP.observation_period_start_date <= Q.start_date and OP.observation_period_end_date >= Q.start_date
-) P
-INNER JOIN
-(
-  -- Begin Condition Occurrence Criteria
-SELECT C.person_id, C.condition_occurrence_id as event_id, C.condition_start_date as start_date, COALESCE(C.condition_end_date, DATEADD(day,1,C.condition_start_date)) as end_date,
-       C.CONDITION_CONCEPT_ID as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.condition_start_date as sort_date
-FROM 
-(
-  SELECT co.* 
-  FROM dbo.CONDITION_OCCURRENCE co
-  JOIN #Codesets codesets on ((co.condition_source_concept_id = codesets.concept_id and codesets.codeset_id = 3))
-) C
-
-
--- End Condition Occurrence Criteria
-
-) A on A.person_id = P.person_id  AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= DATEADD(day,-21,P.START_DATE) AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= DATEADD(day,0,P.END_DATE)
-GROUP BY p.person_id, p.event_id
-HAVING COUNT(A.TARGET_CONCEPT_ID) >= 1
--- End Correlated Criteria
-
-UNION ALL
--- Begin Correlated Criteria
-SELECT 2 as index_id, p.person_id, p.event_id
-FROM (SELECT Q.person_id, Q.event_id, Q.start_date, Q.end_date, Q.visit_occurrence_id, OP.observation_period_start_date as op_start_date, OP.observation_period_end_date as op_end_date
-FROM (-- Begin Visit Occurrence Criteria
-select C.person_id, C.visit_occurrence_id as event_id, C.visit_start_date as start_date, C.visit_end_date as end_date,
-       C.visit_concept_id as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.visit_start_date as sort_date
-from 
-(
-  select vo.* 
-  FROM dbo.VISIT_OCCURRENCE vo
-JOIN #Codesets codesets on ((vo.visit_concept_id = codesets.concept_id and codesets.codeset_id = 4))
-) C
-
-
--- End Visit Occurrence Criteria
-) Q
-JOIN dbo.OBSERVATION_PERIOD OP on Q.person_id = OP.person_id 
-  and OP.observation_period_start_date <= Q.start_date and OP.observation_period_end_date >= Q.start_date
-) P
-INNER JOIN
-(
-  -- Begin Observation Criteria
-select C.person_id, C.observation_id as event_id, C.observation_date as start_date, DATEADD(d,1,C.observation_date) as END_DATE,
-       C.observation_concept_id as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.observation_date as sort_date
-from 
-(
-  select o.* 
-  FROM dbo.OBSERVATION o
-JOIN #Codesets codesets on ((o.observation_source_concept_id = codesets.concept_id and codesets.codeset_id = 3))
-) C
-
-
--- End Observation Criteria
-
-) A on A.person_id = P.person_id  AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= DATEADD(day,-21,P.START_DATE) AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= DATEADD(day,0,P.END_DATE)
-GROUP BY p.person_id, p.event_id
-HAVING COUNT(A.TARGET_CONCEPT_ID) >= 1
--- End Correlated Criteria
-
-UNION ALL
--- Begin Correlated Criteria
-SELECT 3 as index_id, p.person_id, p.event_id
-FROM (SELECT Q.person_id, Q.event_id, Q.start_date, Q.end_date, Q.visit_occurrence_id, OP.observation_period_start_date as op_start_date, OP.observation_period_end_date as op_end_date
-FROM (-- Begin Visit Occurrence Criteria
-select C.person_id, C.visit_occurrence_id as event_id, C.visit_start_date as start_date, C.visit_end_date as end_date,
-       C.visit_concept_id as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.visit_start_date as sort_date
-from 
-(
-  select vo.* 
-  FROM dbo.VISIT_OCCURRENCE vo
-JOIN #Codesets codesets on ((vo.visit_concept_id = codesets.concept_id and codesets.codeset_id = 4))
-) C
-
-
--- End Visit Occurrence Criteria
-) Q
-JOIN dbo.OBSERVATION_PERIOD OP on Q.person_id = OP.person_id 
-  and OP.observation_period_start_date <= Q.start_date and OP.observation_period_end_date >= Q.start_date
-) P
-INNER JOIN
-(
-  -- Begin Measurement Criteria
-select C.person_id, C.measurement_id as event_id, C.measurement_date as start_date, DATEADD(d,1,C.measurement_date) as END_DATE,
-       C.measurement_concept_id as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.measurement_date as sort_date
-from 
-(
-  select m.* 
-  FROM dbo.MEASUREMENT m
-JOIN #Codesets codesets on ((m.measurement_concept_id = codesets.concept_id and codesets.codeset_id = 1))
-) C
-
-
--- End Measurement Criteria
-
-) A on A.person_id = P.person_id  AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= DATEADD(day,-21,P.START_DATE) AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= DATEADD(day,0,P.END_DATE)
-GROUP BY p.person_id, p.event_id
-HAVING COUNT(A.TARGET_CONCEPT_ID) >= 1
--- End Correlated Criteria
-
-UNION ALL
--- Begin Correlated Criteria
-SELECT 4 as index_id, p.person_id, p.event_id
-FROM (SELECT Q.person_id, Q.event_id, Q.start_date, Q.end_date, Q.visit_occurrence_id, OP.observation_period_start_date as op_start_date, OP.observation_period_end_date as op_end_date
-FROM (-- Begin Visit Occurrence Criteria
-select C.person_id, C.visit_occurrence_id as event_id, C.visit_start_date as start_date, C.visit_end_date as end_date,
-       C.visit_concept_id as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.visit_start_date as sort_date
-from 
-(
-  select vo.* 
-  FROM dbo.VISIT_OCCURRENCE vo
-JOIN #Codesets codesets on ((vo.visit_concept_id = codesets.concept_id and codesets.codeset_id = 4))
-) C
-
-
--- End Visit Occurrence Criteria
-) Q
-JOIN dbo.OBSERVATION_PERIOD OP on Q.person_id = OP.person_id 
-  and OP.observation_period_start_date <= Q.start_date and OP.observation_period_end_date >= Q.start_date
-) P
-INNER JOIN
-(
-  -- Begin Measurement Criteria
-select C.person_id, C.measurement_id as event_id, C.measurement_date as start_date, DATEADD(d,1,C.measurement_date) as END_DATE,
-       C.measurement_concept_id as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.measurement_date as sort_date
-from 
-(
-  select m.* 
-  FROM dbo.MEASUREMENT m
-JOIN #Codesets codesets on ((m.measurement_concept_id = codesets.concept_id and codesets.codeset_id = 2))
-) C
-
-WHERE C.value_as_concept_id in (4126681,45877985,9191,45884084,4181412,45879438)
--- End Measurement Criteria
-
-) A on A.person_id = P.person_id  AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= DATEADD(day,-21,P.START_DATE) AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= DATEADD(day,0,P.END_DATE)
-GROUP BY p.person_id, p.event_id
-HAVING COUNT(A.TARGET_CONCEPT_ID) >= 1
--- End Correlated Criteria
-
-UNION ALL
--- Begin Correlated Criteria
-SELECT 5 as index_id, p.person_id, p.event_id
-FROM (SELECT Q.person_id, Q.event_id, Q.start_date, Q.end_date, Q.visit_occurrence_id, OP.observation_period_start_date as op_start_date, OP.observation_period_end_date as op_end_date
-FROM (-- Begin Visit Occurrence Criteria
-select C.person_id, C.visit_occurrence_id as event_id, C.visit_start_date as start_date, C.visit_end_date as end_date,
-       C.visit_concept_id as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.visit_start_date as sort_date
-from 
-(
-  select vo.* 
-  FROM dbo.VISIT_OCCURRENCE vo
-JOIN #Codesets codesets on ((vo.visit_concept_id = codesets.concept_id and codesets.codeset_id = 4))
-) C
-
-
--- End Visit Occurrence Criteria
-) Q
-JOIN dbo.OBSERVATION_PERIOD OP on Q.person_id = OP.person_id 
-  and OP.observation_period_start_date <= Q.start_date and OP.observation_period_end_date >= Q.start_date
-) P
-INNER JOIN
-(
-  -- Begin Observation Criteria
-select C.person_id, C.observation_id as event_id, C.observation_date as start_date, DATEADD(d,1,C.observation_date) as END_DATE,
-       C.observation_concept_id as TARGET_CONCEPT_ID, C.visit_occurrence_id,
-       C.observation_date as sort_date
-from 
-(
-  select o.* 
-  FROM dbo.OBSERVATION o
-JOIN #Codesets codesets on ((o.observation_concept_id = codesets.concept_id and codesets.codeset_id = 2))
-) C
-
-WHERE C.value_as_concept_id in (4126681,45877985,9191,45884084,4181412,45879438)
--- End Observation Criteria
-
-) A on A.person_id = P.person_id  AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= DATEADD(day,-21,P.START_DATE) AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= DATEADD(day,0,P.END_DATE)
-GROUP BY p.person_id, p.event_id
-HAVING COUNT(A.TARGET_CONCEPT_ID) >= 1
--- End Correlated Criteria
-
-  ) CQ on E.person_id = CQ.person_id and E.event_id = CQ.event_id
-  GROUP BY E.person_id, E.event_id
-  HAVING COUNT(index_id) > 0
-) G
--- End Criteria Group
-) AC on AC.person_id = pe.person_id and AC.event_id = pe.event_id
-
-) A on A.person_id = P.person_id  AND A.START_DATE >= P.OP_START_DATE AND A.START_DATE <= P.OP_END_DATE AND A.START_DATE >= DATEADD(day,-180,P.START_DATE) AND A.START_DATE <= DATEADD(day,-1,P.START_DATE)
-GROUP BY p.person_id, p.event_id
-HAVING COUNT(A.TARGET_CONCEPT_ID) = 0
--- End Correlated Criteria
-
-  ) CQ on E.person_id = CQ.person_id and E.event_id = CQ.event_id
-  GROUP BY E.person_id, E.event_id
-  HAVING COUNT(index_id) = 1
-) G
--- End Criteria Group
-) AC on AC.person_id = pe.person_id AND AC.event_id = pe.event_id
-) Results
-;
-
-SELECT inclusion_rule_id, person_id, event_id
-INTO #inclusion_events
-FROM (select inclusion_rule_id, person_id, event_id from #Inclusion_0
-UNION ALL
-select inclusion_rule_id, person_id, event_id from #Inclusion_1) I;
-TRUNCATE TABLE #Inclusion_0;
-DROP TABLE #Inclusion_0;
-
-TRUNCATE TABLE #Inclusion_1;
-DROP TABLE #Inclusion_1;
-
-
-with cteIncludedEvents(event_id, person_id, start_date, end_date, op_start_date, op_end_date, ordinal) as
-(
-  SELECT event_id, person_id, start_date, end_date, op_start_date, op_end_date, row_number() over (partition by person_id order by start_date ASC) as ordinal
-  from
-  (
-    select Q.event_id, Q.person_id, Q.start_date, Q.end_date, Q.op_start_date, Q.op_end_date, SUM(coalesce(POWER(cast(2 as bigint), I.inclusion_rule_id), 0)) as inclusion_rule_mask
-    from #qualified_events Q
-    LEFT JOIN #inclusion_events I on I.person_id = Q.person_id and I.event_id = Q.event_id
-    GROUP BY Q.event_id, Q.person_id, Q.start_date, Q.end_date, Q.op_start_date, Q.op_end_date
-  ) MG -- matching groups
-
-  -- the matching group with all bits set ( POWER(2,# of inclusion rules) - 1 = inclusion_rule_mask
-  WHERE (MG.inclusion_rule_mask = POWER(cast(2 as bigint),2)-1)
-
-)
-select event_id, person_id, start_date, end_date, op_start_date, op_end_date
-into #included_events
-FROM cteIncludedEvents Results
-
-;
-
--- date offset strategy
-
-select event_id, person_id, 
-  case when DATEADD(day,0,end_date) > start_date then DATEADD(day,0,end_date) else start_date end as end_date
-INTO #strategy_ends
-from #included_events;
-
-
--- generate cohort periods into #final_cohort
-with cohort_ends (event_id, person_id, end_date) as
-(
-	-- cohort exit dates
-  -- End Date Strategy
-SELECT event_id, person_id, end_date from #strategy_ends
-
-),
-first_ends (person_id, start_date, end_date) as
-(
-	select F.person_id, F.start_date, F.end_date
-	FROM (
-	  select I.event_id, I.person_id, I.start_date, E.end_date, row_number() over (partition by I.person_id, I.event_id order by E.end_date) as ordinal 
-	  from #included_events I
-	  join cohort_ends E on I.event_id = E.event_id and I.person_id = E.person_id and E.end_date >= I.start_date
-	) F
-	WHERE F.ordinal = 1
-)
-select person_id, start_date, end_date
-INTO #cohort_rows
-from first_ends;
-
-with cteEndDates (person_id, end_date) AS -- the magic
-(	
-	SELECT
-		person_id
-		, DATEADD(day,-1 * 0, event_date)  as end_date
-	FROM
-	(
-		SELECT
-			person_id
-			, event_date
-			, event_type
-			, MAX(start_ordinal) OVER (PARTITION BY person_id ORDER BY event_date, event_type ROWS UNBOUNDED PRECEDING) AS start_ordinal 
-			, ROW_NUMBER() OVER (PARTITION BY person_id ORDER BY event_date, event_type) AS overall_ord
-		FROM
-		(
-			SELECT
-				person_id
-				, start_date AS event_date
-				, -1 AS event_type
-				, ROW_NUMBER() OVER (PARTITION BY person_id ORDER BY start_date) AS start_ordinal
-			FROM #cohort_rows
-		
-			UNION ALL
-		
-
-			SELECT
-				person_id
-				, DATEADD(day,0,end_date) as end_date
-				, 1 AS event_type
-				, NULL
-			FROM #cohort_rows
-		) RAWDATA
-	) e
-	WHERE (2 * e.start_ordinal) - e.overall_ord = 0
-),
-cteEnds (person_id, start_date, end_date) AS
-(
-	SELECT
-		 c.person_id
-		, c.start_date
-		, MIN(e.end_date) AS end_date
-	FROM #cohort_rows c
-	JOIN cteEndDates e ON c.person_id = e.person_id AND e.end_date >= c.start_date
-	GROUP BY c.person_id, c.start_date
-)
-select person_id, min(start_date) as start_date, end_date
-into #final_cohort
-from cteEnds
-group by person_id, end_date
-;
-
-SELECT *
-INTO #concept_table
-FROM (
-SELECT DISTINCT co.person_id, co.condition_start_date AS date, co.condition_concept_id AS concept_id, co.visit_occurrence_id
-FROM condition_occurrence co
-JOIN concept c ON co.condition_concept_id = c.concept_id
+-- -------------------------------------------------------------
+-- Concept hierarchy
+-- Get observed concepts and their ancestors from the desired vocabularies
+-- -------------------------------------------------------------
+-- Get observed concepts from conditions, drugs, and procedures
+SELECT DISTINCT condition_concept_id AS concept_id
+INTO #observed_condition_concepts
+FROM condition_occurrence o
+JOIN concept c ON o.condition_concept_id = c.concept_id
 LEFT JOIN #iatrogenic_codes_with_desc i ON c.concept_id = i.concept_id
-WHERE condition_concept_id != 0 
-	AND c.domain_id = 'Condition'	-- Make sure we only get conditions from the condition_occurrence table
-	AND i.concept_id IS NULL		-- Make sure condition is not an iatrogenic code
-	AND person_id in (SELECT person_id FROM #final_cohort)
-	AND condition_start_date > '2020-03-01'
-  AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)
-UNION ALL
-SELECT DISTINCT de.person_id, de.drug_exposure_start_date AS date, de.drug_concept_id AS concept_id, de.visit_occurrence_id
-FROM drug_exposure de
-JOIN concept c ON de.drug_concept_id = c.concept_id
+WHERE c.domain_id = 'Condition' AND i.concept_id IS NULL;
+
+SELECT DISTINCT drug_concept_id AS concept_id
+INTO #observed_drug_concepts
+FROM drug_exposure o
+JOIN concept c ON o.drug_concept_id = c.concept_id
 LEFT JOIN #iatrogenic_codes_with_desc i ON c.concept_id = i.concept_id
-WHERE drug_concept_id != 0 
-	AND c.domain_id = 'Drug'	-- Make sure we only get conditions from the condition_occurrence table
-	AND i.concept_id IS NULL	-- Make sure condition is not an iatrogenic code
-	AND person_id in (SELECT person_id FROM #final_cohort)
-	AND drug_exposure_start_date > '2020-03-01'
-  AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)
-UNION ALL
-SELECT DISTINCT po.person_id, po.procedure_date AS date, po.procedure_concept_id AS concept_id, po.visit_occurrence_id
-FROM procedure_occurrence po
-JOIN concept c ON po.procedure_concept_id = c.concept_id
+WHERE c.domain_id = 'Drug' AND i.concept_id IS NULL;
+
+SELECT DISTINCT procedure_concept_id AS concept_id
+INTO #observed_procedure_concepts
+FROM procedure_occurrence o
+JOIN concept c ON o.procedure_concept_id = c.concept_id
 LEFT JOIN #iatrogenic_codes_with_desc i ON c.concept_id = i.concept_id
-WHERE procedure_concept_id != 0 
-	AND c.domain_id = 'Procedure'	-- Make sure we only get conditions from the condition_occurrence table
-	AND i.concept_id IS NULL		-- Make sure condition is not an iatrogenic code;
-  AND person_id in (SELECT person_id FROM #final_cohort)
-  AND procedure_date > '2020-03-01'
-  AND visit_occurrence_id in (SELECT DISTINCT visit_occurrence_id FROM #qualified_events)) as tmp
+WHERE c.domain_id = 'Procedure' AND i.concept_id IS NULL;
+
+-- Get condition concepts and their ancestors
+SELECT * 
+INTO #hierarchical_condition_concepts
+FROM
+	((SELECT *
+	FROM #observed_condition_concepts)
+	UNION
+	(SELECT DISTINCT ca.ancestor_concept_id
+	FROM #observed_condition_concepts x
+	JOIN concept_ancestor ca ON ca.descendant_concept_id = x.concept_id
+	JOIN concept c ON ca.ancestor_concept_id = c.concept_id
+	WHERE c.domain_id = 'Condition' AND c.vocabulary_id = 'SNOMED')
+	UNION
+	(SELECT DISTINCT ca.ancestor_concept_id
+	FROM #observed_condition_concepts x
+	JOIN concept_ancestor ca ON ca.descendant_concept_id = x.concept_id
+	JOIN concept c ON ca.ancestor_concept_id = c.concept_id
+	LEFT JOIN concept_relationship cr ON (cr.concept_id_1 = c.concept_id AND cr.relationship_id = 'MedDRA - SNOMED eq')
+	WHERE c.domain_id = 'Condition' AND c.vocabulary_id = 'MedDRA' AND cr.relationship_id IS NULL)) y
 ;
 
-SELECT C.*, P.year_of_birth, P.gender_concept_id
-INTO #final_data
-FROM #concept_table C
-LEFT JOIN dbo.person P ON P.person_id = C.person_id
 
-SELECT DISTINCT person_id
-INTO #adult_cohort
-FROM #final_data
-WHERE 2020 - year_of_birth >= 18 AND 2020 - year_of_birth < 65
+-- Get drug concepts and their ancestors
+SELECT * 
+INTO #hierarchical_drug_concepts
+FROM
+	((SELECT *
+	FROM #observed_drug_concepts)
+	UNION
+	(SELECT DISTINCT ca.ancestor_concept_id
+	FROM #observed_drug_concepts x
+	JOIN concept_ancestor ca ON ca.descendant_concept_id = x.concept_id
+	JOIN concept c ON ca.ancestor_concept_id = c.concept_id
+	WHERE c.domain_id = 'Drug' AND c.vocabulary_id = 'RxNorm' AND c.concept_class_id IN ('Ingredient', 'Clinical Drug Form', 'Clinical Drug Comp', 'Clinical Drug'))
+	UNION
+	(SELECT DISTINCT ca.ancestor_concept_id
+	FROM #observed_drug_concepts x
+	JOIN concept_ancestor ca ON ca.descendant_concept_id = x.concept_id
+	JOIN concept c ON ca.ancestor_concept_id = c.concept_id
+	LEFT JOIN concept_relationship cr ON (cr.concept_id_1 = c.concept_id AND cr.relationship_id IN ('ATC - RxNorm', 'ATC - RxNorm name'))
+	WHERE c.domain_id = 'Drug' AND c.vocabulary_id = 'ATC' AND cr.relationship_id IS NULL)) y
+;
 
-SELECT DISTINCT person_id
-INTO #senior_cohort
-FROM #final_data
-WHERE 2020 - year_of_birth >= 65
+-- Get procedure concepts and their ancestors
+SELECT * 
+INTO #hierarchical_procedure_concepts
+FROM
+	((SELECT *
+	FROM #observed_procedure_concepts)
+	UNION
+	(SELECT DISTINCT ca.ancestor_concept_id
+	FROM #observed_procedure_concepts x
+	JOIN concept_ancestor ca ON ca.descendant_concept_id = x.concept_id
+	JOIN concept c ON ca.ancestor_concept_id = c.concept_id
+	WHERE c.domain_id = 'Procedure' AND c.vocabulary_id IN ('SNOMED', 'ICD10PCS'))
+	UNION
+	(SELECT DISTINCT ca.ancestor_concept_id
+	FROM #observed_procedure_concepts x
+	JOIN concept_ancestor ca ON ca.descendant_concept_id = x.concept_id
+	JOIN concept c ON ca.ancestor_concept_id = c.concept_id
+	LEFT JOIN concept_relationship cr ON (cr.concept_id_1 = c.concept_id AND cr.relationship_id = 'MedDRA - SNOMED eq')
+	WHERE c.domain_id = 'Procedure' AND c.vocabulary_id = 'MedDRA' AND cr.relationship_id IS NULL)) y
+;
 
-SELECT DISTINCT person_id
-INTO #female_cohort
-FROM #final_data
-WHERE gender_concept_id = 8532
+-- Get the vocabularies used in the condition/drug/procedure tables and for their hierarchy
+declare @condition_vocabs TABLE (vocabulary_id varchar(20));
+declare @drug_vocabs TABLE (vocabulary_id varchar(20));
+declare @procedure_vocabs TABLE (vocabulary_id varchar(20));
+INSERT INTO @condition_vocabs (vocabulary_id)
+	(SELECT * 
+	FROM 
+	-- Vocabularies used in hierarchy
+	(values ('SNOMED'), ('MedDRA')) v(vocabulary_id))
+	UNION
+	-- Vocabularies in observational tables
+	(SELECT DISTINCT vocabulary_id
+	FROM condition_occurrence co
+	JOIN concept c ON co.condition_concept_id = c.concept_id
+	WHERE c.domain_id = 'Condition');
+INSERT INTO @drug_vocabs (vocabulary_id)
+	(SELECT * 
+	FROM 
+	-- Vocabularies used in hierarchy
+	(values ('RxNorm'), ('ATC')) v(vocabulary_id))
+	UNION
+	-- Vocabularies in observational tables
+	(SELECT DISTINCT vocabulary_id
+	FROM drug_exposure de2
+	JOIN concept c2 ON de2.drug_concept_id = c2.concept_id
+	WHERE c2.domain_id = 'Drug');
+INSERT INTO @procedure_vocabs (vocabulary_id)
+	(SELECT * 
+	FROM 
+	-- Vocabularies used in hierarchy
+	(values ('SNOMED'), ('MedDRA'), ('ICD10PCS')) v(vocabulary_id))
+	UNION
+	-- Vocabularies in observational tables
+	(SELECT DISTINCT vocabulary_id
+	FROM procedure_occurrence po
+	JOIN concept c ON po.procedure_concept_id = c.concept_id
+	WHERE c.domain_id = 'Procedure');
 
-SELECT DISTINCT person_id
-INTO #male_cohort
-FROM #final_data
-WHERE gender_concept_id = 8507
-
--- Export person ID, start date, and concept IDs for conditions, drugs, and procedures
-:OUT D:\cohd\covid_narrow_noobs_adult.txt
-SELECT person_id, date, concept_id, visit_occurrence_id
-FROM #final_data
-WHERE person_id in (SELECT * FROM #adult_cohort)
-
-TRUNCATE TABLE #strategy_ends;
-DROP TABLE #strategy_ends;
-
-TRUNCATE TABLE #cohort_rows;
-DROP TABLE #cohort_rows;
-
-TRUNCATE TABLE #final_cohort;
-DROP TABLE #final_cohort;
-
-TRUNCATE TABLE #inclusion_events;
-DROP TABLE #inclusion_events;
-
-TRUNCATE TABLE #qualified_events;
-DROP TABLE #qualified_events;
-
-TRUNCATE TABLE #included_events;
-DROP TABLE #included_events;
-
-TRUNCATE TABLE #Codesets;
-DROP TABLE #Codesets;
-
-TRUNCATE TABLE #iatrogenic_codes;
-DROP TABLE #iatrogenic_codes;
-
-TRUNCATE TABLE #iatrogenic_codes_with_desc;
-DROP TABLE #iatrogenic_codes_with_desc;
-
-TRUNCATE TABLE #final_data;
-DROP TABLE #final_data;
-
-TRUNCATE TABLE #concept_table;
-DROP TABLE #concept_table;
-
-TRUNCATE TABLE #female_cohort;
-DROP TABLE #female_cohort;
-
-TRUNCATE TABLE #male_cohort;
-DROP TABLE #male_cohort;
-
-TRUNCATE TABLE #adult_cohort;
-DROP TABLE #adult_cohort;
-
-TRUNCATE TABLE #senior_cohort;
-DROP TABLE #senior_cohort;
+-- Export the hierarchical concepts and their direct descendants from the desired vocabularies
+-- Note: some concepts can be descendants with 0 levels of separation from the ancestor
+-- Note 2: Using variables to store the vocabs instead of using a subquery because the 
+-- subquery was extremely slow despite being non-correlated. 
+:OUT C:\Users\Jay\Desktop\cohd_covid\concept_descendants_direct_q2r2.txt
+SELECT DISTINCT concept_id, descendant_concept_id
+FROM
+	((SELECT ca.ancestor_concept_id AS concept_id, ca.descendant_concept_id
+	FROM #hierarchical_condition_concepts hc
+	JOIN concept_ancestor ca ON ca.ancestor_concept_id = hc.concept_id
+	JOIN concept c ON ca.descendant_concept_id = c.concept_id
+	-- Make sure the descendant concept is one of the observed concepts or its ancestors
+	JOIN #hierarchical_condition_concepts hc2 ON ca.descendant_concept_id = hc2.concept_id 
+	WHERE 
+		-- Don't include the self-ancestor relationship
+		ca.ancestor_concept_id != ca.descendant_concept_id
+		-- Want only immediate descendants (or 0 level descendants)
+		AND ca.min_levels_of_separation <= 1 
+		-- Want only descendants from the same domain
+		AND c.domain_id = 'Condition'
+		-- Want only descendants from the specified vocabs
+		AND c.vocabulary_id IN 
+			(SELECT * FROM @condition_vocabs))
+	UNION
+	(SELECT ca.ancestor_concept_id AS concept_id, ca.descendant_concept_id
+	FROM #hierarchical_drug_concepts hc
+	JOIN concept_ancestor ca ON ca.ancestor_concept_id = hc.concept_id
+	JOIN concept c ON ca.descendant_concept_id = c.concept_id
+	-- Make sure the descendant concept is one of the observed concepts or its ancestors
+	JOIN #hierarchical_drug_concepts hc2 ON ca.descendant_concept_id = hc2.concept_id
+	WHERE 
+		-- Don't include the self-ancestor relationship
+		ca.ancestor_concept_id != ca.descendant_concept_id
+		-- Want only immediate descendants (or 0 level descendants)
+		AND ca.min_levels_of_separation <= 1 
+		-- Want only descendants from the same domain
+		AND c.domain_id = 'Drug'
+		-- Want only descendants from the specified vocabs
+		AND c.vocabulary_id IN
+			(SELECT * FROM @drug_vocabs))
+	UNION
+	(SELECT ca.ancestor_concept_id AS concept_id, ca.descendant_concept_id
+	FROM #hierarchical_procedure_concepts hc
+	JOIN concept_ancestor ca ON ca.ancestor_concept_id = hc.concept_id
+	JOIN concept c ON ca.descendant_concept_id = c.concept_id
+	-- Make sure the descendant concept is one of the observed concepts or its ancestors
+	JOIN #hierarchical_procedure_concepts hc2 ON ca.descendant_concept_id = hc2.concept_id
+	WHERE 
+		-- Don't include the self-ancestor relationship
+		ca.ancestor_concept_id != ca.descendant_concept_id
+		-- Want only immediate descendants (or 0 level descendants)
+		AND ca.min_levels_of_separation <= 1 
+		-- Want only descendants from the same domain
+		AND c.domain_id = 'Procedure'
+		-- Want only descendants from the specified vocabs
+		AND c.vocabulary_id IN
+			(SELECT * FROM @procedure_vocabs))) tmp
+ORDER BY concept_id, descendant_concept_id
+;
