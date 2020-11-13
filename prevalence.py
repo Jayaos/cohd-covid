@@ -580,7 +580,7 @@ def paired_concept_ranged_counts(output_dir, cp_ranged, randomize=True, min_coun
     # Open csv_writer and write header
     output_file = os.path.join(output_dir, filename)
     fh, writer = _open_csv_writer(output_file)
-    writer.writerow(['concept_id1', 'concept_id2', 'count'])
+    writer.writerow(['concept_id1', 'concept_id2', 'count', 'prevalence'])
     
     # How often to display progress message
     n_concepts = len(concept_ids)
